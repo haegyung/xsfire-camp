@@ -52,6 +52,37 @@ Add this to your `settings.json` (paths are examples):
 
 Then open the Agent Panel and start a new thread for "thePrometheus Codex".
 
+## Automation
+
+### Build + install (local)
+
+```
+scripts/build_and_install.sh
+```
+
+Optional overrides:
+
+```
+INSTALL_PATH="$HOME/.local/bin/theprometheus-codex-acp" \
+CARGO_TARGET_DIR="/tmp/theP_codex-target" \
+scripts/build_and_install.sh
+```
+
+### Zed settings backup/restore
+
+```
+scripts/zed_settings_backup.sh
+scripts/zed_settings_restore.sh /path/to/settings.json.bak-YYYYmmddTHHMMSSZ
+```
+
+### Release tagging
+
+```
+scripts/tag_release.sh
+```
+
+Pushing a tag (e.g. `v0.9.0`) triggers the GitHub Actions release workflow.
+
 ### Other clients
 
 Or try it with any of the other [ACP compatible clients](https://agentclientprotocol.com/overview/clients)!
