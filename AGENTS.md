@@ -11,7 +11,7 @@
 - `cargo build --release` builds the optimized binary at `target/release/codex-acp`.
 - `cargo test` runs Rust unit tests (currently in `src/prompt_args.rs`).
 - `scripts/build_and_install.sh` builds and installs the binary; supports overrides like `INSTALL_PATH` and `CARGO_TARGET_DIR`.
-- `scripts/tag_release.sh` tags a release (e.g., `v0.9.0`) and is intended to trigger CI release workflows.
+- `scripts/tag_release.sh` tags a release (e.g., `v0.9.1`) and is intended to trigger CI release workflows.
 - `node npm/testing/test-platform-detection.js` checks npm platform resolution logic.
 
 ## Coding Style & Naming Conventions
