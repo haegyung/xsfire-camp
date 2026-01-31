@@ -19,7 +19,11 @@ fi
 
 (
   cd "$ROOT_DIR"
-  "${ENV_PREFIX[@]}" cargo build --release
+  if [[ ${#ENV_PREFIX[@]} -gt 0 ]]; then
+    "${ENV_PREFIX[@]}" cargo build --release
+  else
+    cargo build --release
+  fi
 )
 
 BIN_PATH="$ROOT_DIR/target/release/codex-acp"

@@ -24,10 +24,11 @@ use agent_client_protocol::{
 };
 use codex_common::approval_presets::{ApprovalPreset, builtin_approval_presets};
 use codex_core::{
-    AuthManager, CodexThread,
+    AuthManager, CodexThread, RolloutRecorder, ThreadSortKey,
     config::{Config, set_project_trust_level},
     error::CodexErr,
     models_manager::manager::{ModelsManager, RefreshStrategy},
+    parse_turn_item,
     parse_command::parse_command,
     protocol::{
         AgentMessageContentDeltaEvent, AgentMessageEvent, AgentReasoningEvent,
@@ -39,7 +40,8 @@ use codex_core::{
         McpStartupUpdateEvent, McpToolCallBeginEvent, McpToolCallEndEvent, Op,
         PatchApplyBeginEvent, PatchApplyEndEvent, ReasoningContentDeltaEvent,
         ReasoningRawContentDeltaEvent, ReviewDecision, ReviewOutputEvent, ReviewRequest,
-        ReviewTarget, SandboxPolicy, StreamErrorEvent, TerminalInteractionEvent, TurnAbortedEvent,
+        ReviewTarget, SandboxPolicy, SessionSource, StreamErrorEvent, TerminalInteractionEvent,
+        TurnAbortedEvent,
         TurnCompleteEvent, TurnStartedEvent, UserMessageEvent, ViewImageToolCallEvent,
         WarningEvent, WebSearchBeginEvent, WebSearchEndEvent,
     },
@@ -50,11 +52,12 @@ use codex_protocol::{
     approvals::ElicitationRequestEvent,
     config_types::TrustLevel,
     custom_prompts::CustomPrompt,
+    items::TurnItem,
     models::ResponseItem,
     openai_models::{ModelPreset, ReasoningEffort},
     parse_command::ParsedCommand,
     plan_tool::{PlanItemArg, StepStatus, UpdatePlanArgs},
-    protocol::RolloutItem,
+    protocol::{RolloutItem, SessionMetaLine},
     user_input::UserInput,
 };
 use heck::ToTitleCase;
@@ -63,6 +66,7 @@ use mcp_types::{CallToolResult, RequestId};
 use serde_json::json;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
+use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 use crate::{
@@ -72,6 +76,15 @@ use crate::{
 
 static APPROVAL_PRESETS: LazyLock<Vec<ApprovalPreset>> = LazyLock::new(builtin_approval_presets);
 const INIT_COMMAND_PROMPT: &str = include_str!("./prompt_for_init_command.md");
+const SESSION_LIST_PAGE_SIZE: usize = 25;
+const SESSION_TITLE_MAX_GRAPHEMES: usize = 120;
+
+#[derive(Clone, Debug)]
+struct SessionListEntry {
+    id: SessionId,
+    title: Option<String>,
+    updated_at: Option<String>,
+}
 
 /// Trait for abstracting over the `CodexThread` to make testing easier.
 #[async_trait::async_trait]
@@ -1579,6 +1592,8 @@ struct ThreadActor<A> {
     message_rx: mpsc::UnboundedReceiver<ThreadMessage>,
     /// Last config options state we emitted to the client, used for deduping updates.
     last_sent_config_options: Option<Vec<SessionConfigOption>>,
+    /// Cached session list for /load lookups.
+    last_session_list: Vec<SessionListEntry>,
 }
 
 impl<A: Auth> ThreadActor<A> {
@@ -1600,6 +1615,7 @@ impl<A: Auth> ThreadActor<A> {
             submissions: HashMap::new(),
             message_rx,
             last_sent_config_options: None,
+            last_session_list: Vec::new(),
         }
     }
 
@@ -1671,6 +1687,9 @@ impl<A: Auth> ThreadActor<A> {
                         ))
                         .await;
                 });
+                if let Err(err) = self.handle_sessions_command().await {
+                    error!("Failed to list sessions: {err:?}");
+                }
             }
             ThreadMessage::GetConfigOptions { response_tx } => {
                 let result = self.config_options().await;
@@ -1745,6 +1764,14 @@ impl<A: Auth> ThreadActor<A> {
                 "summarize conversation to prevent hitting the context limit",
             ),
             AvailableCommand::new("undo", "undo Codex’s most recent turn"),
+            AvailableCommand::new(
+                "sessions",
+                "list recent sessions for the current workspace",
+            ),
+            AvailableCommand::new("load", "show instructions to open a previous session")
+                .input(AvailableCommandInput::Unstructured(
+                    UnstructuredCommandInput::new("session id or list number"),
+                )),
             AvailableCommand::new("logout", "logout of Codex"),
         ]
     }
@@ -1911,6 +1938,62 @@ impl<A: Auth> ThreadActor<A> {
         }
 
         Ok(options)
+    }
+
+    async fn list_sessions_for_cwd(&self) -> Result<Vec<SessionListEntry>, Error> {
+        let page = RolloutRecorder::list_threads(
+            &self.config.codex_home,
+            SESSION_LIST_PAGE_SIZE,
+            None,
+            ThreadSortKey::UpdatedAt,
+            &[
+                SessionSource::Cli,
+                SessionSource::VSCode,
+                SessionSource::Unknown,
+            ],
+            None,
+            self.config.model_provider_id.as_str(),
+        )
+        .await
+        .map_err(|err| Error::internal_error().data(format!("failed to list sessions: {err}")))?;
+
+        let sessions = page
+            .items
+            .into_iter()
+            .filter_map(|item| {
+                let session_meta_line = item
+                    .head
+                    .first()
+                    .and_then(|first| serde_json::from_value::<SessionMetaLine>(first.clone()).ok())?;
+
+                if session_meta_line.meta.cwd != self.config.cwd {
+                    return None;
+                }
+
+                let mut title = None;
+                for value in item.head {
+                    if let Ok(response_item) = serde_json::from_value::<ResponseItem>(value)
+                        && let Some(turn_item) = parse_turn_item(&response_item)
+                        && let TurnItem::UserMessage(user) = turn_item
+                    {
+                        if let Some(formatted) = format_session_title(&user.message()) {
+                            title = Some(formatted);
+                        }
+                        break;
+                    }
+                }
+
+                let updated_at = item.updated_at.clone().or(item.created_at.clone());
+
+                Some(SessionListEntry {
+                    id: SessionId::new(session_meta_line.meta.id.to_string()),
+                    title,
+                    updated_at,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        Ok(sessions)
     }
 
     async fn maybe_emit_config_options_update(&mut self) {
@@ -2080,6 +2163,49 @@ impl<A: Auth> ThreadActor<A> {
             .config_options(self.config_options().await?))
     }
 
+    async fn handle_sessions_command(&mut self) -> Result<(), Error> {
+        let sessions = self.list_sessions_for_cwd().await?;
+        self.last_session_list = sessions.clone();
+        let message = format_session_list_message(&self.config.cwd, &sessions);
+        self.client.send_agent_text(message).await;
+        Ok(())
+    }
+
+    async fn handle_load_command(&mut self, rest: &str) -> Result<(), Error> {
+        let selection = rest.trim();
+        if selection.is_empty() {
+            self.client
+                .send_agent_text("Usage: /load <session id or list number>")
+                .await;
+            return Ok(());
+        }
+
+        let target_id = if let Ok(index) = selection.parse::<usize>() {
+            if index == 0 || index > self.last_session_list.len() {
+                None
+            } else {
+                Some(self.last_session_list[index - 1].id.clone())
+            }
+        } else {
+            Some(SessionId::new(selection.to_string()))
+        };
+
+        let Some(session_id) = target_id else {
+            self.client
+                .send_agent_text("Unknown session selection. Run /sessions and pick a valid number.")
+                .await;
+            return Ok(());
+        };
+
+        self.client
+            .send_agent_text(format!(
+                "Session switching must be initiated by the ACP client. In Zed, open the thread list and select session id: {}",
+                session_id
+            ))
+            .await;
+        Ok(())
+    }
+
     async fn handle_prompt(
         &mut self,
         request: PromptRequest,
@@ -2092,6 +2218,16 @@ impl<A: Auth> ThreadActor<A> {
             match name {
                 "compact" => op = Op::Compact,
                 "undo" => op = Op::Undo,
+                "sessions" => {
+                    self.handle_sessions_command().await?;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "load" => {
+                    self.handle_load_command(rest).await?;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
                 "init" => {
                     op = Op::UserInput {
                         items: vec![UserInput::Text {
@@ -2839,6 +2975,62 @@ fn web_search_action_to_title_and_id(
 /// Generate a fallback ID using UUID (used when id is missing)
 fn generate_fallback_id(prefix: &str) -> String {
     format!("{}_{}", prefix, Uuid::new_v4())
+}
+
+fn truncate_graphemes(text: &str, max_graphemes: usize) -> String {
+    let mut graphemes = text.grapheme_indices(true);
+
+    if let Some((byte_index, _)) = graphemes.nth(max_graphemes) {
+        if max_graphemes >= 3 {
+            let mut truncate_graphemes = text.grapheme_indices(true);
+            if let Some((truncate_byte_index, _)) = truncate_graphemes.nth(max_graphemes - 3) {
+                let truncated = &text[..truncate_byte_index];
+                format!("{truncated}...")
+            } else {
+                text.to_string()
+            }
+        } else {
+            let truncated = &text[..byte_index];
+            truncated.to_string()
+        }
+    } else {
+        text.to_string()
+    }
+}
+
+fn format_session_title(message: &str) -> Option<String> {
+    let normalized = message.replace(['\r', '\n'], " ");
+    let trimmed = normalized.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(truncate_graphemes(trimmed, SESSION_TITLE_MAX_GRAPHEMES))
+    }
+}
+
+fn format_session_list_message(cwd: &Path, sessions: &[SessionListEntry]) -> String {
+    if sessions.is_empty() {
+        return format!(
+            "No previous sessions found for {}.\nStart chatting to create one.",
+            cwd.display()
+        );
+    }
+
+    let mut lines = Vec::with_capacity(sessions.len() + 2);
+    lines.push(format!("Sessions for {}:", cwd.display()));
+    for (index, entry) in sessions.iter().enumerate() {
+        let title = entry.title.as_deref().unwrap_or("(untitled)");
+        let updated = entry.updated_at.as_deref().unwrap_or("unknown");
+        lines.push(format!(
+            "{}) {} [id: {}] (updated: {})",
+            index + 1,
+            title,
+            entry.id,
+            updated
+        ));
+    }
+    lines.push("Use /load <id or number> to show how to open a previous session.".to_string());
+    lines.join("\n")
 }
 
 /// Checks if a prompt is slash command

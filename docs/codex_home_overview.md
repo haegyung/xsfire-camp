@@ -1,6 +1,6 @@
 # CODEX_HOME 구조 및 권한 체크리스트
 
-`CODEx_HOME`은 Codex CLI/ACP가 공유하는 사용자 데이터 디렉토리입니다. 기본값은 `~/.config/codex`이며 다음과 같은 하위 항목을 갖습니다.
+`CODEx_HOME`은 Codex CLI/ACP가 공유하는 사용자 데이터 디렉토리입니다. 기본값은 `~/.codex`이며, 구버전 환경에서는 `~/.config/codex`일 수 있습니다. 다음과 같은 하위 항목을 갖습니다.
 
 | 항목 | 설명 | 접근 필요성 |
 | - | - | - |

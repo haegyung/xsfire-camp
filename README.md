@@ -36,7 +36,7 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 Register this binary as a custom ACP agent in Zed. This keeps your setup stable even
 when Zed updates its built-in Codex adapter.
 
-Add this to your `settings.json` (paths are examples):
+Add this to your `settings.json` (paths are examples; Zed may not expand `$HOME` in `env`, so prefer an absolute path):
 
 ```
 {
@@ -44,7 +44,9 @@ Add this to your `settings.json` (paths are examples):
     "thePrometheus Codex": {
       "type": "custom",
       "command": "/absolute/path/to/theprometheus-codex-acp",
-      "env": {}
+      "env": {
+        "CODEX_HOME": "/Users/you/.codex"
+      }
     }
   }
 }

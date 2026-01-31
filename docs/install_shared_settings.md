@@ -4,13 +4,13 @@
 
 ## 1. `CODEX_HOME` 통일
 
-Codex CLI와 ACP가 같은 설정/세션을 공유하려면 `CODEX_HOME` 환경 변수를 반드시 동일하게 설정합니다. 대부분 환경의 기본값은 `~/.config/codex`입니다.
+Codex CLI와 ACP가 같은 설정/세션을 공유하려면 `CODEX_HOME` 환경 변수를 반드시 동일하게 설정합니다. 기본값은 `~/.codex`이며, 구버전 환경에서는 `~/.config/codex`일 수 있습니다.
 
 ```bash
-CODEX_HOME="$HOME/.config/codex" codex-acp
+CODEX_HOME="$HOME/.codex" codex-acp
 ```
 
-Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필드에 위와 같이 `CODEX_HOME=` 접두를 붙이거나, `settings.json`의 `agent_servers.thePrometheus Codex.env`에 `"CODEX_HOME": "$HOME/.config/codex"`을 추가하세요. 그러면 CLI에서 만든 `settings.toml`, `threads/`, `rollouts/`, `credentials/`가 그대로 재사용됩니다.
+Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필드에 위와 같이 `CODEX_HOME=` 접두를 붙이거나, `settings.json`의 `agent_servers.thePrometheus Codex.env`에 `"CODEX_HOME": "/Users/you/.codex"`처럼 **절대 경로**를 넣으세요. (Zed는 `env`의 `$HOME`를 확장하지 않는 경우가 있습니다.) 그러면 CLI에서 만든 `settings.toml`, `threads/`, `rollouts/`, `credentials/`가 그대로 재사용됩니다. (구버전 CLI 홈을 쓰는 경우 값만 `~/.config/codex`로 맞추면 됩니다.)
 
 ## 2. 로그인 세션/자격증명 재사용
 
