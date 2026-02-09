@@ -2,7 +2,7 @@
 name = "theprometheus-codex-acp"
 version = "0.9.2"
 edition = "2024"
-authors = ["Zed <hi@zed.dev>"]
+authors = ["haegyung <g@theprometheus.xyz>"]
 license = "Apache-2.0"
 description = "An ACP-compatible coding agent powered by Codex"
 repository = "https://github.com/haegyung/theP_codex"

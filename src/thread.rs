@@ -49,7 +49,7 @@ use codex_core::{
 };
 use codex_protocol::{
     approvals::ElicitationRequestEvent,
-    config_types::TrustLevel,
+    config_types::{Personality, TrustLevel},
     custom_prompts::CustomPrompt,
     items::TurnItem,
     models::ResponseItem,
@@ -313,6 +313,8 @@ enum SubmissionState {
     Prompt(PromptState),
     /// Subtask, like /compact
     Task(TaskState),
+    /// One-shot slash commands that return a single response event.
+    OneShot(OneShotCommandState),
 }
 
 impl SubmissionState {
@@ -321,6 +323,7 @@ impl SubmissionState {
             Self::CustomPrompts(state) => state.is_active(),
             Self::Prompt(state) => state.is_active(),
             Self::Task(state) => state.is_active(),
+            Self::OneShot(state) => state.is_active(),
         }
     }
 
@@ -329,6 +332,7 @@ impl SubmissionState {
             Self::CustomPrompts(state) => state.handle_event(event),
             Self::Prompt(state) => state.handle_event(client, event).await,
             Self::Task(state) => state.handle_event(client, event).await,
+            Self::OneShot(state) => state.handle_event(client, event).await,
         }
     }
 }
@@ -363,6 +367,58 @@ impl CustomPromptsState {
             e => {
                 warn!("Unexpected event: {e:?}");
             }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OneShotKind {
+    McpTools,
+    Skills,
+}
+
+struct OneShotCommandState {
+    kind: OneShotKind,
+    response_tx: Option<oneshot::Sender<Result<StopReason, Error>>>,
+}
+
+impl OneShotCommandState {
+    fn new(kind: OneShotKind, response_tx: oneshot::Sender<Result<StopReason, Error>>) -> Self {
+        Self {
+            kind,
+            response_tx: Some(response_tx),
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        let Some(response_tx) = &self.response_tx else {
+            return false;
+        };
+        !response_tx.is_closed()
+    }
+
+    async fn handle_event(&mut self, client: &SessionClient, event: EventMsg) {
+        match (self.kind, event) {
+            (OneShotKind::McpTools, EventMsg::McpListToolsResponse(event)) => {
+                client
+                    .send_agent_text(format_mcp_tools_message(&event))
+                    .await;
+                if let Some(tx) = self.response_tx.take() {
+                    drop(tx.send(Ok(StopReason::EndTurn)));
+                }
+            }
+            (OneShotKind::Skills, EventMsg::ListSkillsResponse(event)) => {
+                client.send_agent_text(format_skills_message(&event)).await;
+                if let Some(tx) = self.response_tx.take() {
+                    drop(tx.send(Ok(StopReason::EndTurn)));
+                }
+            }
+            (_, EventMsg::Error(err)) => {
+                if let Some(tx) = self.response_tx.take() {
+                    drop(tx.send(Err(Error::internal_error().data(err.message))));
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -1735,6 +1791,26 @@ impl<A: Auth> ThreadActor<A> {
 
     fn builtin_commands() -> Vec<AvailableCommand> {
         vec![
+            // CLI parity: expose common Codex CLI slash commands in ACP clients.
+            // Commands that depend on interactive TUI menus are implemented as
+            // "show config options" / "print instructions" in this adapter.
+            AvailableCommand::new("model", "choose what model and reasoning effort to use"),
+            AvailableCommand::new("personality", "choose a communication style for responses"),
+            AvailableCommand::new("approvals", "choose what Codex can do without approval"),
+            AvailableCommand::new("permissions", "choose what Codex is allowed to do"),
+            AvailableCommand::new("experimental", "toggle beta features"),
+            AvailableCommand::new(
+                "skills",
+                "use skills to improve how Codex performs specific tasks",
+            ),
+            AvailableCommand::new("mcp", "list configured MCP tools"),
+            AvailableCommand::new("status", "show current session configuration"),
+            AvailableCommand::new("new", "start a new chat during a conversation"),
+            AvailableCommand::new("resume", "resume a saved chat"),
+            AvailableCommand::new("fork", "fork the current chat"),
+            AvailableCommand::new("diff", "show git diff"),
+            AvailableCommand::new("mention", "mention a file"),
+            AvailableCommand::new("feedback", "send logs to maintainers"),
             AvailableCommand::new("review", "Review my current changes and find issues").input(
                 AvailableCommandInput::Unstructured(UnstructuredCommandInput::new(
                     "optional custom review instructions",
@@ -1934,6 +2010,28 @@ impl<A: Auth> ThreadActor<A> {
             );
         }
 
+        let current_personality = self
+            .config
+            .model_personality
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "auto".to_string());
+        let personality_select_options = vec![
+            SessionConfigSelectOption::new("auto", "Auto")
+                .description("Use the default personality (no override)"),
+            SessionConfigSelectOption::new(Personality::Friendly.to_string(), "Friendly"),
+            SessionConfigSelectOption::new(Personality::Pragmatic.to_string(), "Pragmatic"),
+        ];
+        options.push(
+            SessionConfigOption::select(
+                "personality",
+                "Personality",
+                current_personality,
+                personality_select_options,
+            )
+            .category(SessionConfigOptionCategory::Other)
+            .description("Choose a communication style for responses"),
+        );
+
         Ok(options)
     }
 
@@ -2021,6 +2119,7 @@ impl<A: Auth> ThreadActor<A> {
             "mode" => self.handle_set_mode(SessionModeId::new(value.0)).await,
             "model" => self.handle_set_config_model(value).await,
             "reasoning_effort" => self.handle_set_config_reasoning_effort(value).await,
+            "personality" => self.handle_set_config_personality(value).await,
             _ => Err(Error::invalid_params().data("Unsupported config option")),
         }
     }
@@ -2115,6 +2214,40 @@ impl<A: Auth> ThreadActor<A> {
             .map_err(|e| Error::from(anyhow::anyhow!(e)))?;
 
         self.config.model_reasoning_effort = Some(effort);
+
+        Ok(())
+    }
+
+    async fn handle_set_config_personality(
+        &mut self,
+        value: SessionConfigValueId,
+    ) -> Result<(), Error> {
+        let raw = value.0;
+        if raw.as_ref() == "auto" {
+            // Best-effort: protocol doesn't support clearing personality overrides via
+            // OverrideTurnContext, so we only clear our local config state.
+            self.config.model_personality = None;
+            return Ok(());
+        }
+
+        let personality: Personality =
+            serde_json::from_value(raw.as_ref().into()).map_err(|_| Error::invalid_params())?;
+
+        self.thread
+            .submit(Op::OverrideTurnContext {
+                cwd: None,
+                approval_policy: None,
+                sandbox_policy: None,
+                model: None,
+                effort: None,
+                summary: None,
+                collaboration_mode: None,
+                personality: Some(personality),
+            })
+            .await
+            .map_err(|e| Error::from(anyhow::anyhow!(e)))?;
+
+        self.config.model_personality = Some(personality);
 
         Ok(())
     }
@@ -2214,6 +2347,123 @@ impl<A: Auth> ThreadActor<A> {
         let op;
         if let Some((name, rest)) = extract_slash_command(&items) {
             match name {
+                // CLI parity commands that map to ACP config options / instructions.
+                "model" => {
+                    self.maybe_emit_config_options_update().await;
+                    let current_model = self.get_current_model().await;
+                    self.client
+                        .send_agent_text(format!(
+                            "Current model: {current_model}\n\nUse your client configuration UI (Config Options) to change `Model` and `Reasoning Effort`."
+                        ))
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "personality" => {
+                    self.maybe_emit_config_options_update().await;
+                    let current = self
+                        .config
+                        .model_personality
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "auto".to_string());
+                    self.client
+                        .send_agent_text(format!(
+                            "Current personality: {current}\n\nUse your client configuration UI (Config Options) to change `Personality`."
+                        ))
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "approvals" | "permissions" => {
+                    self.maybe_emit_config_options_update().await;
+                    self.client
+                        .send_agent_text(
+                            "Use your client configuration UI (Config Options) to change `Approval Preset`.\n\nNote: this adapter currently models approvals and permissions together via `Approval Preset`."
+                                .to_string(),
+                        )
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "experimental" => {
+                    self.client
+                        .send_agent_text(
+                            "This CLI command depends on an interactive menu and is not yet supported in ACP.\nIf you have a specific feature you want toggled, say which and we can wire it up."
+                                .to_string(),
+                        )
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "status" => {
+                    self.maybe_emit_config_options_update().await;
+                    let current_model = self.get_current_model().await;
+                    let approval_preset = self
+                        .modes()
+                        .map(|m| m.current_mode_id.0.to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let effort = self
+                        .config
+                        .model_reasoning_effort
+                        .map(|e| e.to_string())
+                        .unwrap_or_else(|| "auto".to_string());
+                    let personality = self
+                        .config
+                        .model_personality
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "auto".to_string());
+                    self.client
+                        .send_agent_text(format!(
+                            "Session status:\n- model: {current_model}\n- reasoning_effort: {effort}\n- personality: {personality}\n- approval_preset: {approval_preset}"
+                        ))
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "new" | "resume" | "fork" | "agent" => {
+                    self.client
+                        .send_agent_text(
+                            "Session/thread switching must be initiated by the ACP client.\nIn Zed, use the Agent Panel thread list to start a new thread or pick a previous session."
+                                .to_string(),
+                        )
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "mention" => {
+                    self.client
+                        .send_agent_text(
+                            "Use `@file` mentions (or attach files) from your ACP client. This adapter already supports embedded context."
+                                .to_string(),
+                        )
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "feedback" => {
+                    self.client
+                        .send_agent_text(
+                            "In ACP, there is no built-in log upload flow yet. If you want, paste the relevant snippet from `logs/codex_chats/...` (redact secrets) and we can triage."
+                                .to_string(),
+                        )
+                        .await;
+                    drop(response_tx.send(Ok(StopReason::EndTurn)));
+                    return Ok(response_rx);
+                }
+                "mcp" => op = Op::ListMcpTools,
+                "skills" => {
+                    op = Op::ListSkills {
+                        cwds: vec![],
+                        force_reload: false,
+                    }
+                }
+                "diff" => {
+                    // Best-effort: run git diff in the configured cwd. Output will stream through
+                    // ExecCommand events like other command executions.
+                    op = Op::RunUserShellCommand {
+                        command: "git diff --no-color --".to_string(),
+                    }
+                }
                 "compact" => op = Op::Compact,
                 "undo" => op = Op::Undo,
                 "sessions" => {
@@ -2321,6 +2571,13 @@ impl<A: Auth> ThreadActor<A> {
                 response_tx,
                 submission_id.clone(),
             )),
+            Op::ListMcpTools => SubmissionState::OneShot(OneShotCommandState::new(
+                OneShotKind::McpTools,
+                response_tx,
+            )),
+            Op::ListSkills { .. } => {
+                SubmissionState::OneShot(OneShotCommandState::new(OneShotKind::Skills, response_tx))
+            }
             _ => SubmissionState::Prompt(PromptState::new(
                 self.thread.clone(),
                 response_tx,
@@ -3031,6 +3288,74 @@ fn format_session_list_message(cwd: &Path, sessions: &[SessionListEntry]) -> Str
     lines.join("\n")
 }
 
+fn format_mcp_tools_message(event: &codex_core::protocol::McpListToolsResponseEvent) -> String {
+    let mut tool_names = event.tools.keys().cloned().collect::<Vec<_>>();
+    tool_names.sort();
+
+    let mut lines = Vec::new();
+    if tool_names.is_empty() {
+        lines.push("No MCP tools configured.".to_string());
+    } else {
+        lines.push(format!("MCP tools ({}):", tool_names.len()));
+        lines.extend(tool_names.into_iter().map(|name| format!("- {name}")));
+    }
+
+    if !event.auth_statuses.is_empty() {
+        let mut statuses = event
+            .auth_statuses
+            .iter()
+            .map(|(server, status)| format!("{server}: {status}"))
+            .collect::<Vec<_>>();
+        statuses.sort();
+        lines.push(String::new());
+        lines.push("MCP auth:".to_string());
+        lines.extend(statuses.into_iter().map(|s| format!("- {s}")));
+    }
+
+    lines.join("\n")
+}
+
+fn format_skills_message(event: &codex_core::protocol::ListSkillsResponseEvent) -> String {
+    let mut lines = Vec::new();
+    if event.skills.is_empty() {
+        return "No skills found.".to_string();
+    }
+
+    for entry in &event.skills {
+        lines.push(format!("Skills for {}:", entry.cwd.display()));
+        let mut skills = entry.skills.clone();
+        skills.sort_by(|a, b| a.name.cmp(&b.name));
+
+        if skills.is_empty() {
+            lines.push("- (none)".to_string());
+        } else {
+            for skill in skills {
+                let enabled = if skill.enabled { "enabled" } else { "disabled" };
+                lines.push(format!(
+                    "- {} ({:?}, {enabled}): {}",
+                    skill.name, skill.scope, skill.description
+                ));
+            }
+        }
+
+        if !entry.errors.is_empty() {
+            lines.push("Skill errors:".to_string());
+            for err in &entry.errors {
+                lines.push(format!("- {}: {}", err.path.display(), err.message));
+            }
+        }
+
+        lines.push(String::new());
+    }
+
+    // Remove trailing blank line for cleaner display
+    while lines.last().is_some_and(|l| l.is_empty()) {
+        lines.pop();
+    }
+
+    lines.join("\n")
+}
+
 /// Checks if a prompt is slash command
 fn extract_slash_command(content: &[UserInput]) -> Option<(&str, &str)> {
     let line = content.first().and_then(|block| match block {
@@ -3176,6 +3501,96 @@ mod tests {
 
         let ops = thread.ops.lock().unwrap();
         assert_eq!(ops.as_slice(), &[Op::Undo]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_mcp() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/mcp".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(
+                &notifications[0].update,
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("MCP") // "No MCP tools..." or listing
+            ),
+            "notifications don't match {notifications:?}"
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert_eq!(ops.as_slice(), &[Op::ListMcpTools]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skills() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/skills".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(
+                &notifications[0].update,
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("demo-skill")
+            ),
+            "notifications don't match {notifications:?}"
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert_eq!(
+            ops.as_slice(),
+            &[Op::ListSkills {
+                cwds: vec![],
+                force_reload: false,
+            }]
+        );
 
         Ok(())
     }
@@ -3639,6 +4054,61 @@ mod tests {
             self.ops.lock().unwrap().push(op.clone());
 
             match op {
+                Op::ListMcpTools => {
+                    self.op_tx
+                        .send(Event {
+                            id: id.to_string(),
+                            msg: EventMsg::McpListToolsResponse(
+                                codex_core::protocol::McpListToolsResponseEvent {
+                                    tools: std::collections::HashMap::new(),
+                                    resources: std::collections::HashMap::new(),
+                                    resource_templates: std::collections::HashMap::new(),
+                                    auth_statuses: std::collections::HashMap::new(),
+                                },
+                            ),
+                        })
+                        .unwrap();
+                    self.op_tx
+                        .send(Event {
+                            id: id.to_string(),
+                            msg: EventMsg::TurnComplete(TurnCompleteEvent {
+                                last_agent_message: None,
+                            }),
+                        })
+                        .unwrap();
+                }
+                Op::ListSkills { .. } => {
+                    self.op_tx
+                        .send(Event {
+                            id: id.to_string(),
+                            msg: EventMsg::ListSkillsResponse(
+                                codex_core::protocol::ListSkillsResponseEvent {
+                                    skills: vec![codex_core::protocol::SkillsListEntry {
+                                        cwd: PathBuf::from("/tmp/repo"),
+                                        skills: vec![codex_core::protocol::SkillMetadata {
+                                            name: "demo-skill".to_string(),
+                                            description: "Demo skill".to_string(),
+                                            short_description: None,
+                                            interface: None,
+                                            path: PathBuf::from("/tmp/repo/SKILL.md"),
+                                            scope: codex_core::protocol::SkillScope::Repo,
+                                            enabled: true,
+                                        }],
+                                        errors: vec![],
+                                    }],
+                                },
+                            ),
+                        })
+                        .unwrap();
+                    self.op_tx
+                        .send(Event {
+                            id: id.to_string(),
+                            msg: EventMsg::TurnComplete(TurnCompleteEvent {
+                                last_agent_message: None,
+                            }),
+                        })
+                        .unwrap();
+                }
                 Op::UserInput { items, .. } => {
                     let prompt = items
                         .into_iter()

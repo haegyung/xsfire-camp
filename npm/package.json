@@ -4,7 +4,7 @@
 	"type": "module",
 	"description": "An ACP-compatible coding agent powered by Codex",
 	"license": "Apache-2.0",
-	"author": "haegyung",
+	"author": "haegyung <g@theprometheus.xyz>",
 	"homepage": "https://github.com/haegyung/theP_codex",
 	"repository": {
 		"type": "git",
