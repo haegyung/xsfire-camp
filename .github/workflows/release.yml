@@ -109,7 +109,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Code sign macOS binary
-        if: startsWith(matrix.os, 'macos')
+        if: startsWith(matrix.os, 'macos') && secrets.MACOS_CERTIFICATE != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -120,7 +120,7 @@ jobs:
           ./script/sign-mac target/${{ matrix.target }}/release/theprometheus-codex-acp
 
       - name: Code sign Windows binary
-        if: startsWith(matrix.os, 'windows')
+        if: startsWith(matrix.os, 'windows') && secrets.AZURE_SIGNING_TENANT_ID != ''
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
