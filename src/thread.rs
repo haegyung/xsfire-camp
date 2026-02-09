@@ -3418,6 +3418,108 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_slash_command_smoke_flow() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+
+        async fn send_prompt(
+            message_tx: &UnboundedSender<ThreadMessage>,
+            session_id: &SessionId,
+            prompt: &str,
+        ) -> anyhow::Result<StopReason> {
+            let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+            message_tx.send(ThreadMessage::Prompt {
+                request: PromptRequest::new(session_id.clone(), vec![prompt.into()]),
+                response_tx: prompt_response_tx,
+            })?;
+            Ok(prompt_response_rx.await??.await??)
+        }
+
+        // The thread actor runs on a tokio LocalSet. Drive the LocalSet concurrently with
+        // sending prompts, otherwise the test will deadlock waiting for responses.
+        tokio::try_join!(
+            async {
+                // Basic end-to-end smoke: CLI parity slash commands work and can be chained.
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/init").await?,
+                    StopReason::EndTurn
+                );
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "Hello").await?,
+                    StopReason::EndTurn
+                );
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/review").await?,
+                    StopReason::EndTurn
+                );
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/compact").await?,
+                    StopReason::EndTurn
+                );
+
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let texts: Vec<String> = notifications
+            .iter()
+            .map(|n| match &n.update {
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) => text.clone(),
+                other => panic!("Unexpected notification update: {other:?}"),
+            })
+            .collect();
+
+        assert_eq!(
+            texts.as_slice(),
+            &[
+                INIT_COMMAND_PROMPT.to_string(),
+                "Hello".to_string(),
+                "current changes".to_string(),
+                "Compact task completed".to_string(),
+            ]
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert_eq!(
+            ops.as_slice(),
+            &[
+                Op::UserInput {
+                    items: vec![UserInput::Text {
+                        text: INIT_COMMAND_PROMPT.to_string(),
+                        text_elements: vec![]
+                    }],
+                    final_output_json_schema: None,
+                },
+                Op::UserInput {
+                    items: vec![UserInput::Text {
+                        text: "Hello".to_string(),
+                        text_elements: vec![]
+                    }],
+                    final_output_json_schema: None,
+                },
+                Op::Review {
+                    review_request: ReviewRequest {
+                        user_facing_hint: Some(user_facing_hint(&ReviewTarget::UncommittedChanges)),
+                        target: ReviewTarget::UncommittedChanges,
+                    }
+                },
+                Op::Compact,
+            ],
+            "ops don't match {ops:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_compact() -> anyhow::Result<()> {
         let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
         let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
