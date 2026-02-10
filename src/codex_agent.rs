@@ -32,6 +32,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     local_spawner::{AcpFs, LocalSpawner},
+    session_store::{GlobalSessionIndex, SessionStore},
     thread::Thread,
 };
 
@@ -52,6 +53,10 @@ pub struct CodexAgent {
     sessions: Rc<RefCell<HashMap<SessionId, Rc<Thread>>>>,
     /// Session working directories for filesystem sandboxing
     session_roots: Arc<Mutex<HashMap<SessionId, PathBuf>>>,
+    /// Optional global canonical session store, for cross-backend continuity.
+    ///
+    /// If `ACP_HOME` (or `$HOME`) can't be resolved, this stays disabled.
+    global_session_index: Option<Arc<Mutex<GlobalSessionIndex>>>,
 }
 
 const SESSION_LIST_PAGE_SIZE: usize = 25;
@@ -86,6 +91,8 @@ impl CodexAgent {
                 ))
             }),
         );
+
+        let global_session_index = GlobalSessionIndex::load().map(|idx| Arc::new(Mutex::new(idx)));
         Self {
             auth_manager,
             client_capabilities,
@@ -93,6 +100,7 @@ impl CodexAgent {
             thread_manager,
             sessions: Rc::default(),
             session_roots,
+            global_session_index,
         }
     }
 
@@ -337,6 +345,19 @@ impl Agent for CodexAgent {
             .lock()
             .unwrap()
             .insert(session_id.clone(), config.cwd.clone());
+
+        let session_store = self.global_session_index.as_ref().and_then(|idx| {
+            let mut index = idx.lock().ok()?;
+            let global_id = index.get_or_create(&format!("codex:{}", session_id.0))?;
+            SessionStore::init(
+                global_id,
+                "codex",
+                session_id.0.as_ref().to_string(),
+                thread_id.to_string(),
+                Some(&config.cwd),
+            )
+        });
+
         let thread = Rc::new(Thread::new(
             session_id.clone(),
             thread,
@@ -344,6 +365,7 @@ impl Agent for CodexAgent {
             self.thread_manager.get_models_manager(),
             self.client_capabilities.clone(),
             config.clone(),
+            session_store,
         ));
         let load = thread.load().await?;
 
@@ -393,7 +415,7 @@ impl Agent for CodexAgent {
         let config = self.build_session_config(&cwd, mcp_servers)?;
 
         let NewThread {
-            thread_id: _,
+            thread_id,
             thread,
             session_configured: _,
         } = Box::pin(self.thread_manager.resume_thread_from_rollout(
@@ -404,6 +426,18 @@ impl Agent for CodexAgent {
         .await
         .map_err(|e| Error::internal_error().data(e.to_string()))?;
 
+        let session_store = self.global_session_index.as_ref().and_then(|idx| {
+            let mut index = idx.lock().ok()?;
+            let global_id = index.get_or_create(&format!("codex:{}", session_id.0))?;
+            SessionStore::init(
+                global_id,
+                "codex",
+                session_id.0.as_ref().to_string(),
+                thread_id.to_string(),
+                Some(&config.cwd),
+            )
+        });
+
         let thread = Rc::new(Thread::new(
             session_id.clone(),
             thread,
@@ -411,6 +445,7 @@ impl Agent for CodexAgent {
             self.thread_manager.get_models_manager(),
             self.client_capabilities.clone(),
             config.clone(),
+            session_store,
         ));
 
         thread.replay_history(rollout_items).await?;

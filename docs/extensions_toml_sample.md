@@ -6,7 +6,7 @@ Add an entry like the following to register the extension in `zed-industries/ext
 [[extension]]
 name = "thePrometheus Codex ACP"
 id = "theprometheus-codex-acp"
-version = "0.9.2"
+version = "X.Y.Z"
 path = "extensions/thePrometheus-codex-acp"
 description = "Codex CLI parity ACP adapter with shared CODEX_HOME."
 homepage = "https://github.com/haegyung/theP_codex"

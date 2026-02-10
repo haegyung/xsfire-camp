@@ -71,6 +71,7 @@ use uuid::Uuid;
 use crate::{
     ACP_CLIENT,
     prompt_args::{expand_custom_prompt, parse_slash_name},
+    session_store::SessionStore,
 };
 
 static APPROVAL_PRESETS: LazyLock<Vec<ApprovalPreset>> = LazyLock::new(builtin_approval_presets);
@@ -182,12 +183,13 @@ impl Thread {
         models_manager: Arc<dyn ModelsManagerImpl>,
         client_capabilities: Arc<Mutex<ClientCapabilities>>,
         config: Config,
+        session_store: Option<SessionStore>,
     ) -> Self {
         let (message_tx, message_rx) = mpsc::unbounded_channel();
 
         let actor = ThreadActor::new(
             auth,
-            SessionClient::new(session_id, client_capabilities),
+            SessionClient::new(session_id, client_capabilities, session_store),
             thread,
             models_manager,
             config,
@@ -1484,14 +1486,20 @@ struct SessionClient {
     session_id: SessionId,
     client: Arc<dyn Client>,
     client_capabilities: Arc<Mutex<ClientCapabilities>>,
+    session_store: Option<SessionStore>,
 }
 
 impl SessionClient {
-    fn new(session_id: SessionId, client_capabilities: Arc<Mutex<ClientCapabilities>>) -> Self {
+    fn new(
+        session_id: SessionId,
+        client_capabilities: Arc<Mutex<ClientCapabilities>>,
+        session_store: Option<SessionStore>,
+    ) -> Self {
         Self {
             session_id,
             client: ACP_CLIENT.get().expect("Client should be set").clone(),
             client_capabilities,
+            session_store,
         }
     }
 
@@ -1500,11 +1508,19 @@ impl SessionClient {
         session_id: SessionId,
         client: Arc<dyn Client>,
         client_capabilities: Arc<Mutex<ClientCapabilities>>,
+        session_store: Option<SessionStore>,
     ) -> Self {
         Self {
             session_id,
             client,
             client_capabilities,
+            session_store,
+        }
+    }
+
+    fn log_canonical(&self, kind: &str, data: serde_json::Value) {
+        if let Some(store) = self.session_store.as_ref() {
+            store.log(kind, data);
         }
     }
 
@@ -1533,32 +1549,50 @@ impl SessionClient {
     }
 
     async fn send_user_message(&self, text: impl Into<String>) {
+        let text = text.into();
+        self.log_canonical("acp.user_message_chunk", json!({ "text": text }));
         self.send_notification(SessionUpdate::UserMessageChunk(ContentChunk::new(
-            text.into().into(),
+            text.into(),
         )))
         .await;
     }
 
     async fn send_agent_text(&self, text: impl Into<String>) {
+        let text = text.into();
+        self.log_canonical("acp.agent_message_chunk", json!({ "text": text }));
         self.send_notification(SessionUpdate::AgentMessageChunk(ContentChunk::new(
-            text.into().into(),
+            text.into(),
         )))
         .await;
     }
 
     async fn send_agent_thought(&self, text: impl Into<String>) {
+        let text = text.into();
+        self.log_canonical("acp.agent_thought_chunk", json!({ "text": text }));
         self.send_notification(SessionUpdate::AgentThoughtChunk(ContentChunk::new(
-            text.into().into(),
+            text.into(),
         )))
         .await;
     }
 
     async fn send_tool_call(&self, tool_call: ToolCall) {
+        let value = serde_json::to_value(&tool_call).unwrap_or_else(|_| {
+            json!({
+                "debug": format!("{tool_call:?}")
+            })
+        });
+        self.log_canonical("acp.tool_call", value);
         self.send_notification(SessionUpdate::ToolCall(tool_call))
             .await;
     }
 
     async fn send_tool_call_update(&self, update: ToolCallUpdate) {
+        let value = serde_json::to_value(&update).unwrap_or_else(|_| {
+            json!({
+                "debug": format!("{update:?}")
+            })
+        });
+        self.log_canonical("acp.tool_call_update", value);
         self.send_notification(SessionUpdate::ToolCallUpdate(update))
             .await;
     }
@@ -1595,6 +1629,21 @@ impl SessionClient {
     }
 
     async fn update_plan(&self, plan: Vec<PlanItemArg>) {
+        self.log_canonical(
+            "acp.plan",
+            json!({
+                "items": plan.iter().map(|p| {
+                    json!({
+                        "step": p.step,
+                        "status": match p.status {
+                            StepStatus::Pending => "pending",
+                            StepStatus::InProgress => "in_progress",
+                            StepStatus::Completed => "completed",
+                        }
+                    })
+                }).collect::<Vec<_>>(),
+            }),
+        );
         self.send_notification(SessionUpdate::Plan(Plan::new(
             plan.into_iter()
                 .map(|entry| {
@@ -1618,13 +1667,31 @@ impl SessionClient {
         tool_call: ToolCallUpdate,
         options: Vec<PermissionOption>,
     ) -> Result<RequestPermissionResponse, Error> {
-        self.client
+        self.log_canonical(
+            "acp.request_permission",
+            json!({
+                "tool_call": serde_json::to_value(&tool_call).unwrap_or_else(|_| json!({"debug": format!("{tool_call:?}")})),
+                "options": serde_json::to_value(&options).unwrap_or_else(|_| json!({"debug": format!("{options:?}")})),
+            }),
+        );
+
+        let resp = self
+            .client
             .request_permission(RequestPermissionRequest::new(
                 self.session_id.clone(),
                 tool_call,
                 options,
             ))
-            .await
+            .await?;
+
+        self.log_canonical(
+            "acp.request_permission_response",
+            json!({
+                "outcome": serde_json::to_value(&resp.outcome).unwrap_or_else(|_| json!({"debug": format!("{:?}", resp.outcome)})),
+            }),
+        );
+
+        Ok(resp)
     }
 }
 
@@ -2343,6 +2410,9 @@ impl<A: Auth> ThreadActor<A> {
     ) -> Result<oneshot::Receiver<Result<StopReason, Error>>, Error> {
         let (response_tx, response_rx) = oneshot::channel();
 
+        self.client
+            .log_canonical("acp.prompt", summarize_prompt_for_log(&request.prompt));
+
         let items = build_prompt_items(request.prompt);
         let op;
         if let Some((name, rest)) = extract_slash_command(&items) {
@@ -2564,6 +2634,14 @@ impl<A: Auth> ThreadActor<A> {
 
         info!("Submitted prompt with submission_id: {submission_id}");
         info!("Starting to wait for conversation events for submission_id: {submission_id}");
+
+        self.client.log_canonical(
+            "backend.codex.submit",
+            json!({
+                "submission_id": submission_id,
+                "op_kind": op_kind_for_log(&op),
+            }),
+        );
 
         let state = match op {
             Op::Compact | Op::Undo => SubmissionState::Task(TaskState::new(
@@ -3054,6 +3132,90 @@ fn build_prompt_items(prompt: Vec<ContentBlock>) -> Vec<UserInput> {
             ContentBlock::Audio(..) | ContentBlock::Resource(..) | _ => None,
         })
         .collect()
+}
+
+fn summarize_prompt_for_log(prompt: &[ContentBlock]) -> serde_json::Value {
+    let log_embedded_context = std::env::var("ACP_LOG_EMBEDDED_CONTEXT")
+        .ok()
+        .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+    let max_text_chars: usize = std::env::var("ACP_LOG_MAX_TEXT_CHARS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(16_384);
+
+    let mut text_blocks: Vec<String> = Vec::new();
+    let mut resource_links: Vec<serde_json::Value> = Vec::new();
+    let mut embedded_text_resources: Vec<serde_json::Value> = Vec::new();
+
+    let mut image_count = 0usize;
+    let mut audio_count = 0usize;
+    let mut other_count = 0usize;
+
+    for block in prompt {
+        match block {
+            ContentBlock::Text(t) => text_blocks.push(t.text.clone()),
+            ContentBlock::ResourceLink(ResourceLink { name, uri, .. }) => {
+                resource_links.push(json!({ "name": name, "uri": uri }));
+            }
+            ContentBlock::Resource(EmbeddedResource {
+                resource:
+                    EmbeddedResourceResource::TextResourceContents(TextResourceContents {
+                        text,
+                        uri,
+                        ..
+                    }),
+                ..
+            }) => {
+                // Avoid duplicating large / sensitive context by default.
+                let mut item = json!({
+                    "uri": uri,
+                    "text_len": text.len(),
+                    "included": log_embedded_context,
+                });
+
+                if log_embedded_context {
+                    let mut s = text.clone();
+                    if s.chars().count() > max_text_chars {
+                        s = s.chars().take(max_text_chars).collect::<String>() + "\n...[truncated]";
+                    }
+                    item["text"] = serde_json::Value::String(s);
+                }
+                embedded_text_resources.push(item);
+            }
+            ContentBlock::Image(_) => image_count += 1,
+            ContentBlock::Audio(_) => audio_count += 1,
+            _ => other_count += 1,
+        }
+    }
+
+    let mut text = text_blocks.join("\n");
+    if text.chars().count() > max_text_chars {
+        text = text.chars().take(max_text_chars).collect::<String>() + "\n...[truncated]";
+    }
+
+    json!({
+        "block_count": prompt.len(),
+        "text": text,
+        "resource_links": resource_links,
+        "embedded_text_resources": embedded_text_resources,
+        "image_count": image_count,
+        "audio_count": audio_count,
+        "other_count": other_count,
+    })
+}
+
+fn op_kind_for_log(op: &Op) -> &'static str {
+    match op {
+        Op::UserInput { .. } => "user_input",
+        Op::Review { .. } => "review",
+        Op::Compact => "compact",
+        Op::Undo => "undo",
+        Op::ListMcpTools => "list_mcp_tools",
+        Op::ListSkills { .. } => "list_skills",
+        Op::RunUserShellCommand { .. } => "run_shell_command",
+        Op::ListCustomPrompts => "list_custom_prompts",
+        _ => "other",
+    }
 }
 
 fn format_uri_as_link(name: Option<String>, uri: String) -> String {
@@ -4081,7 +4243,7 @@ mod tests {
         let session_id = SessionId::new("test");
         let client = Arc::new(StubClient::new());
         let session_client =
-            SessionClient::with_client(session_id.clone(), client.clone(), Arc::default());
+            SessionClient::with_client(session_id.clone(), client.clone(), Arc::default(), None);
         let conversation = Arc::new(StubCodexThread::new());
         let models_manager = Arc::new(StubModelsManager);
         let config = Config::load_with_cli_overrides_and_harness_overrides(
