@@ -2,7 +2,7 @@
 	"name": "@haegyung/${PACKAGE_NAME}",
 	"version": "${VERSION}",
 	"description": "An ACP-compatible coding agent powered by Codex - ${OS} ${ARCH} binary",
-	"license": "Apache-2.0",
+	"license": "CC-BY-NC-SA-4.0",
 	"author": "haegyung",
 	"homepage": "https://github.com/haegyung/xsfire-camp",
 	"repository": {
