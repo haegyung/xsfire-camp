@@ -5,13 +5,13 @@
 	"description": "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends.",
 	"license": "Apache-2.0",
 	"author": "haegyung <g@theprometheus.xyz>",
-	"homepage": "https://github.com/haegyung/theP_codex",
+	"homepage": "https://github.com/haegyung/xsfire-camp",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/haegyung/theP_codex.git"
+		"url": "git+https://github.com/haegyung/xsfire-camp.git"
 	},
 	"bugs": {
-		"url": "https://github.com/haegyung/theP_codex/issues"
+		"url": "https://github.com/haegyung/xsfire-camp/issues"
 	},
 	"keywords": [
 		"codex",

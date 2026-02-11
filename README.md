@@ -227,7 +227,7 @@ node npm/testing/test-platform-detection.js
 ### Releases
 
 If you need a prebuilt binary, see:
-[haegyung/theP_codex releases](https://github.com/haegyung/theP_codex/releases)
+[haegyung/xsfire-camp releases](https://github.com/haegyung/xsfire-camp/releases)
 
 ## License
 

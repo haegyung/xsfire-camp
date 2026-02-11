@@ -38,11 +38,11 @@ Read the docs on [External Agent](https://zed.dev/docs/ai/external-agents) suppo
 
 ### Other clients
 
-[Submit a PR](https://github.com/haegyung/theP_codex/pulls) to add yours!
+[Submit a PR](https://github.com/haegyung/xsfire-camp/pulls) to add yours!
 
 #### Installation
 
-Install the adapter from the latest release for your architecture and OS: https://github.com/haegyung/theP_codex/releases
+Install the adapter from the latest release for your architecture and OS: https://github.com/haegyung/xsfire-camp/releases
 
 You can then use `xsfire-camp` as a regular ACP agent:
 

@@ -5,8 +5,8 @@ edition = "2024"
 authors = ["haegyung <g@theprometheus.xyz>"]
 license = "Apache-2.0"
 description = "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends."
-repository = "https://github.com/haegyung/theP_codex"
-homepage = "https://github.com/haegyung/theP_codex"
+repository = "https://github.com/haegyung/xsfire-camp"
+homepage = "https://github.com/haegyung/xsfire-camp"
 
 [[bin]]
 name = "xsfire-camp"

@@ -4,10 +4,10 @@
 	"description": "An ACP-compatible coding agent powered by Codex - ${OS} ${ARCH} binary",
 	"license": "Apache-2.0",
 	"author": "haegyung",
-	"homepage": "https://github.com/haegyung/theP_codex",
+	"homepage": "https://github.com/haegyung/xsfire-camp",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/haegyung/theP_codex.git"
+		"url": "git+https://github.com/haegyung/xsfire-camp.git"
 	},
 	"bin": {
 		"${PACKAGE_NAME}": "bin/xsfire-camp"
