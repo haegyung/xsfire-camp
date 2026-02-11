@@ -11,6 +11,9 @@ Scope: reinforce ACP slash command parity and make local repo artifacts less noi
   - `.gitignore` includes `logs` and `.DS_Store`
   - no tracked files under `logs/`
   - no tracked `.DS_Store` files
+- Traceability:
+  - status update commit: `afc3190` (`chore: update v0.9.4 release plan status`)
+  - release tags: `v0.9.4` -> `43bbe0e`, `v0.9.5` -> `2cf1842`
 
 ## Goals
 - Add a scenario-based smoke test that chains common slash commands in one session.
