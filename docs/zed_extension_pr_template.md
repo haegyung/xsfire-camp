@@ -7,8 +7,9 @@ Use this template when submitting the extension update to `zed-industries/extens
 
 ### Summary
 - registers xsfire-camp as a Zed extension
-- uses `xsfire-camp` binary (vX.Y.Z) and shares CODEX_HOME with CLI
+- uses `xsfire-camp` binary (v0.9.5) and shares CODEX_HOME with CLI
 - adds documentation links for installation, verification, and CODEX_HOME sharing
+- initial target in this PR: `darwin-aarch64` (asset + sha256 verified)
 
 ### Testing
 - `cargo test`
