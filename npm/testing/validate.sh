@@ -24,7 +24,7 @@ check_command grep
 
 # 1. Validate wrapper script syntax
 echo "1. Validating wrapper script syntax..."
-if node -c npm/bin/theprometheus-codex-acp.js 2>/dev/null; then
+if node -c npm/bin/xsfire-camp.js 2>/dev/null; then
   echo -e "${GREEN}✓ Wrapper script syntax is valid${NC}"
 else
   echo -e "${RED}✗ Wrapper script has syntax errors${NC}"
@@ -76,12 +76,12 @@ echo
 # 5. Verify optional dependencies list
 echo "5. Verifying platform packages..."
 EXPECTED_PACKAGES=(
-  "@haegyung/theprometheus-codex-acp-darwin-arm64"
-  "@haegyung/theprometheus-codex-acp-darwin-x64"
-  "@haegyung/theprometheus-codex-acp-linux-arm64"
-  "@haegyung/theprometheus-codex-acp-linux-x64"
-  "@haegyung/theprometheus-codex-acp-win32-arm64"
-  "@haegyung/theprometheus-codex-acp-win32-x64"
+  "@haegyung/xsfire-camp-darwin-arm64"
+  "@haegyung/xsfire-camp-darwin-x64"
+  "@haegyung/xsfire-camp-linux-arm64"
+  "@haegyung/xsfire-camp-linux-x64"
+  "@haegyung/xsfire-camp-win32-arm64"
+  "@haegyung/xsfire-camp-win32-x64"
 )
 
 missing_packages=0

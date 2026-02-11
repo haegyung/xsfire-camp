@@ -29,19 +29,19 @@ if [[ -z "${MACOS_CERTIFICATE:-}" || -z "${MACOS_CERTIFICATE_PASSWORD:-}" || -z 
 fi
 
 echo "Setting up keychain for code signing..."
-security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" theprometheus-codex-acp.keychain || echo ""
-security default-keychain -s theprometheus-codex-acp.keychain
-security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" theprometheus-codex-acp.keychain
-security set-keychain-settings theprometheus-codex-acp.keychain
-echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/theprometheus-codex-acp-certificate.p12
-security import /tmp/theprometheus-codex-acp-certificate.p12 -k theprometheus-codex-acp.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-rm /tmp/theprometheus-codex-acp-certificate.p12
-security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" theprometheus-codex-acp.keychain
+security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" xsfire-camp.keychain || echo ""
+security default-keychain -s xsfire-camp.keychain
+security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" xsfire-camp.keychain
+security set-keychain-settings xsfire-camp.keychain
+echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/xsfire-camp-certificate.p12
+security import /tmp/xsfire-camp-certificate.p12 -k xsfire-camp.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+rm /tmp/xsfire-camp-certificate.p12
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" xsfire-camp.keychain
 
 function cleanup() {
     echo "Cleaning up keychain"
     security default-keychain -s login.keychain
-    security delete-keychain theprometheus-codex-acp.keychain
+    security delete-keychain xsfire-camp.keychain
 }
 
 trap cleanup EXIT

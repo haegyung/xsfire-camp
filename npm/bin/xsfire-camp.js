@@ -11,16 +11,16 @@ function getPlatformPackage() {
 
   const platformMap = {
     darwin: {
-      arm64: "theprometheus-codex-acp-darwin-arm64",
-      x64: "theprometheus-codex-acp-darwin-x64",
+      arm64: "xsfire-camp-darwin-arm64",
+      x64: "xsfire-camp-darwin-x64",
     },
     linux: {
-      arm64: "theprometheus-codex-acp-linux-arm64",
-      x64: "theprometheus-codex-acp-linux-x64",
+      arm64: "xsfire-camp-linux-arm64",
+      x64: "xsfire-camp-linux-x64",
     },
     win32: {
-      arm64: "theprometheus-codex-acp-win32-arm64",
-      x64: "theprometheus-codex-acp-win32-x64",
+      arm64: "xsfire-camp-win32-arm64",
+      x64: "xsfire-camp-win32-x64",
     },
   };
 
@@ -44,8 +44,8 @@ function getBinaryPath() {
   const packageName = getPlatformPackage();
   const binaryName =
     process.platform === "win32"
-      ? "theprometheus-codex-acp.exe"
-      : "theprometheus-codex-acp";
+      ? "xsfire-camp.exe"
+      : "xsfire-camp";
 
   try {
     // Try to resolve the platform-specific package

@@ -11,7 +11,7 @@ Use this checklist before tagging/publishing the extension release.
    - [x] `cargo test` (unit tests and event coverage) passes locally.
    - [x] `TaskState` delegates to `PromptState` to reuse event handling.
 3. **Zed-specific**
-   - [ ] `extensions/thePrometheus-codex-acp/manifest.toml` references vX.Y.Z binaries.
+   - [ ] `extensions/xsfire-camp/manifest.toml` references vX.Y.Z binaries.
    - [ ] `extensions.toml` entry matches sample snippet and uses `pnpm sort-extensions`.
    - [ ] PR body follows `docs/zed_extension_pr_template.md` content.
 4. **Release Artifacts**

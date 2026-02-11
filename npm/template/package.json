@@ -10,7 +10,7 @@
 		"url": "git+https://github.com/haegyung/theP_codex.git"
 	},
 	"bin": {
-		"${PACKAGE_NAME}": "bin/theprometheus-codex-acp"
+		"${PACKAGE_NAME}": "bin/xsfire-camp"
 	},
 	"os": [
 		"${OS}"

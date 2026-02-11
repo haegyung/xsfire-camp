@@ -7,7 +7,7 @@
 | `settings.toml` | Codex 설정(autocomplete, default model, project trust 등). | ACP가 CLI와 동일한 config를 읽도록 이 파일이 같아야 합니다. 읽기 권한만 필요합니다. |
 | `threads/` | 생성된 세션의 rollout/metadata. | ACP가 CLI 세션 메타데이터(`SessionMetaLine`)를 매핑할 때 읽기/쓰기. 파일 소유자와 권한이 동일해야 `ThreadManager`가 접근 가능합니다. |
 | `rollouts/` | 각 session의 전체 rollout history. | 이어받기/팔로우/로드 시 읽기/쓰기. gzip/serde 처리하므로 파일이 잠겨 있지 않아야 합니다. |
-| `credentials/` | ChatGPT/OpenAI API 토큰, login server 메타. | 인증 흐름에서 읽고 쓰므로 `600` 수준의 권한을 유지하십시오. ACL 상 `theprometheus-codex-acp` 프로세스와 CLI 사용자 계정이 동일해야 합니다. |
+| `credentials/` | ChatGPT/OpenAI API 토큰, login server 메타. | 인증 흐름에서 읽고 쓰므로 `600` 수준의 권한을 유지하십시오. ACL 상 `xsfire-camp` 프로세스와 CLI 사용자 계정이 동일해야 합니다. |
 | `logs/` | 내부 로그 (Codex CLI와 공용). | 선택적이며 디버깅시 `RUST_LOG` 설정에 따라 생성됩니다. 보통 `644` 권한이면 충분합니다. |
 | `workspace/` | (선택) 각 세션의 가상 작업공간. | sandbox/`RolloutRecorder`가 작업 디렉토리(세션 루트)를 만들기 때문에 쓰기 권한 필요. |
 

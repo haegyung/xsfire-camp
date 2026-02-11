@@ -7,10 +7,10 @@
 Codex CLI와 ACP가 같은 설정/세션을 공유하려면 `CODEX_HOME` 환경 변수를 반드시 동일하게 설정합니다. 기본값은 `~/.codex`이며, 구버전 환경에서는 `~/.config/codex`일 수 있습니다.
 
 ```bash
-CODEX_HOME="$HOME/.codex" theprometheus-codex-acp
+CODEX_HOME="$HOME/.codex" xsfire-camp
 ```
 
-Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필드에 위와 같이 `CODEX_HOME=` 접두를 붙이거나, `settings.json`의 `agent_servers.thePrometheus Codex ACP.env`에 `"CODEX_HOME": "/Users/you/.codex"`처럼 **절대 경로**를 넣으세요. (Zed는 `env`의 `$HOME`를 확장하지 않는 경우가 있습니다.) 그러면 CLI에서 만든 `settings.toml`, `threads/`, `rollouts/`, `credentials/`가 그대로 재사용됩니다. (구버전 CLI 홈을 쓰는 경우 값만 `~/.config/codex`로 맞추면 됩니다.)
+Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필드에 위와 같이 `CODEX_HOME=` 접두를 붙이거나, `settings.json`의 `agent_servers.xsfire-camp.env`에 `"CODEX_HOME": "/Users/you/.codex"`처럼 **절대 경로**를 넣으세요. (Zed는 `env`의 `$HOME`를 확장하지 않는 경우가 있습니다.) 그러면 CLI에서 만든 `settings.toml`, `threads/`, `rollouts/`, `credentials/`가 그대로 재사용됩니다. (구버전 CLI 홈을 쓰는 경우 값만 `~/.config/codex`로 맞추면 됩니다.)
 
 ## 2. 로그인 세션/자격증명 재사용
 
@@ -25,9 +25,9 @@ Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필
 
 | 항목 | 설명 |
 | - | - |
-| 바이너리 설치 | `scripts/build_and_install.sh`로 `theprometheus-codex-acp`를 `$HOME/.local/bin` 등에 설치하세요. |
+| 바이너리 설치 | `scripts/build_and_install.sh`로 `xsfire-camp`를 `$HOME/.local/bin` 등에 설치하세요. |
 | 환경 변수 | `CODEX_HOME`과 `PATH`에 설치 위치를 명시해야 CLI와 ACP가 동일한 홈을 사용합니다. |
-| Zed 등록 | `settings.json`에서 `agent_servers.thePrometheus Codex ACP.command`에 `CODEX_HOME`을 붙여주고, 필요하면 `env`로 추가하세요. |
+| Zed 등록 | `settings.json`에서 `agent_servers.xsfire-camp.command`에 `CODEX_HOME`을 붙여주고, 필요하면 `env`로 추가하세요. |
 | 인증 | CLI에서 사용하던 `credentials/`가 그대로 사용되므로 `OPENAI_API_KEY`, `CODEX_API_KEY` 등도 동일하게 가져갑니다. |
 
 ## 참고 자료

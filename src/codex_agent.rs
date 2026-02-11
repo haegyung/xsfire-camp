@@ -244,8 +244,8 @@ impl Agent for CodexAgent {
         Ok(InitializeResponse::new(protocol_version)
             .agent_capabilities(agent_capabilities)
             .agent_info(
-                Implementation::new("theprometheus-codex-acp", env!("CARGO_PKG_VERSION"))
-                    .title("thePrometheus Codex ACP"),
+                Implementation::new("xsfire-camp", env!("CARGO_PKG_VERSION"))
+                    .title("xsfire-camp"),
             )
             .auth_methods(auth_methods))
     }

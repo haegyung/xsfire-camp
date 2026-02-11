@@ -1,4 +1,4 @@
-# thePrometheus Codex ACP
+# xsfire-camp
 
 에디터가 바뀌어도 작업을 이어가고, AI가 실행한 명령과 수정 내역을 승인까지 포함해 깔끔하게 남깁니다.
 
@@ -13,7 +13,7 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 
 ## 총정리 (KR)
 
-`theprometheus-codex-acp`는 **Codex CLI(codex-rs)** 를 **ACP(Agent Client Protocol)** 에이전트로 감싸, Zed/VS Code(ACP 확장) 같은 ACP 클라이언트에서 Codex를 “대화”가 아니라 **작업 실행이 포함된 세션**으로 운용하게 해줍니다.
+`xsfire-camp`는 **Codex CLI(codex-rs)** 를 **ACP(Agent Client Protocol)** 에이전트로 감싸, Zed/VS Code(ACP 확장) 같은 ACP 클라이언트에서 Codex를 “대화”가 아니라 **작업 실행이 포함된 세션**으로 운용하게 해줍니다.
 핵심 가치는 **CLI 세션과 ACP 세션이 동일한 `CODEX_HOME` 저장소/메타데이터를 공유**하도록 맞춰, 클라이언트가 달라도 작업 흐름이 끊기지 않는다는 점입니다.
 
 ### 가지고 있는 기능
@@ -95,13 +95,13 @@ cargo build --release
 바이너리 경로:
 
 ```
-target/release/theprometheus-codex-acp
+target/release/xsfire-camp
 ```
 
 실행(ACP stdio 에이전트로 동작):
 
 ```
-OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/theprometheus-codex-acp
+OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 ```
 
 ### Zed (custom agent registration)
@@ -113,9 +113,9 @@ Zed에 custom ACP agent로 등록하면, Zed 내장 Codex 어댑터 변화와 �
 ```
 {
   "agent_servers": {
-    "thePrometheus Codex ACP": {
+    "xsfire-camp": {
       "type": "custom",
-      "command": "/absolute/path/to/theprometheus-codex-acp",
+      "command": "/absolute/path/to/xsfire-camp",
       "env": {
         "CODEX_HOME": "/Users/you/.codex"
       }
@@ -124,7 +124,7 @@ Zed에 custom ACP agent로 등록하면, Zed 내장 Codex 어댑터 변화와 �
 }
 ```
 
-Agent Panel에서 "thePrometheus Codex ACP"로 새 스레드를 시작합니다.
+Agent Panel에서 "xsfire-camp"로 새 스레드를 시작합니다.
 
 ### VS Code
 
@@ -135,13 +135,13 @@ VS Code에서 사용하려면 “ACP 클라이언트 역할”을 하는 확장/
 이 바이너리는 `acp`/`--acp` 인자를 받아도 동일하게 ACP 에이전트로 동작하도록 호환되어 있으므로 아래 형태로도 실행될 수 있습니다:
 
 ```
-theprometheus-codex-acp acp
+xsfire-camp acp
 ```
 
-VS Code 확장이 PATH에서 에이전트를 찾는 방식이라면, 다음 중 하나로 `theprometheus-codex-acp` 커맨드를 PATH에 노출하세요.
+VS Code 확장이 PATH에서 에이전트를 찾는 방식이라면, 다음 중 하나로 `xsfire-camp` 커맨드를 PATH에 노출하세요.
 
 ```
-npm i -g @haegyung/theprometheus-codex-acp
+npm i -g @haegyung/xsfire-camp
 ```
 
 또는 직접 빌드한 바이너리를 PATH에 두고 실행해도 됩니다.
@@ -155,7 +155,7 @@ CODEX_HOME="$HOME/.codex" OPENAI_API_KEY=sk-... code .
 ### npm으로 실행
 
 ```
-npx @haegyung/theprometheus-codex-acp
+npx @haegyung/xsfire-camp
 ```
 
 ## 기술 메모 (KR)
@@ -187,7 +187,7 @@ cargo build --release
 Run (ACP agent over stdio):
 
 ```
-OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/theprometheus-codex-acp
+OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 ```
 
 ### Quick start (npm)
@@ -195,13 +195,13 @@ OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/theprometheus-cod
 Run:
 
 ```
-npx @haegyung/theprometheus-codex-acp
+npx @haegyung/xsfire-camp
 ```
 
-Install globally (to expose `theprometheus-codex-acp` on PATH):
+Install globally (to expose `xsfire-camp` on PATH):
 
 ```
-npm i -g @haegyung/theprometheus-codex-acp
+npm i -g @haegyung/xsfire-camp
 ```
 
 ### Clients

@@ -44,16 +44,16 @@ Read the docs on [External Agent](https://zed.dev/docs/ai/external-agents) suppo
 
 Install the adapter from the latest release for your architecture and OS: https://github.com/haegyung/theP_codex/releases
 
-You can then use `theprometheus-codex-acp` as a regular ACP agent:
+You can then use `xsfire-camp` as a regular ACP agent:
 
 ```
-OPENAI_API_KEY=sk-... theprometheus-codex-acp
+OPENAI_API_KEY=sk-... xsfire-camp
 ```
 
 Or via npm:
 
 ```
-npx @haegyung/theprometheus-codex-acp
+npx @haegyung/xsfire-camp
 ```
 
 ## License

@@ -50,19 +50,19 @@ for target in "${!platforms[@]}"; do
   echo "📦 Processing $target from $(basename "$archive_path")"
 
   # Create package name
-  pkg_name="theprometheus-codex-acp-${os}-${arch}"
+  pkg_name="xsfire-camp-${os}-${arch}"
   pkg_dir="$OUTPUT_DIR/${pkg_name}"
   mkdir -p "${pkg_dir}/bin"
 
   # Extract binary
   if [[ "$archive_ext" == "zip" ]]; then
-    unzip -q -j "$archive_path" "theprometheus-codex-acp${ext}" -d "${pkg_dir}/bin/"
+    unzip -q -j "$archive_path" "xsfire-camp${ext}" -d "${pkg_dir}/bin/"
   else
-    tar xzf "$archive_path" -C "${pkg_dir}/bin/" "theprometheus-codex-acp${ext}"
+    tar xzf "$archive_path" -C "${pkg_dir}/bin/" "xsfire-camp${ext}"
   fi
 
   # Make binary executable (important for Unix-like systems)
-  chmod +x "${pkg_dir}/bin/theprometheus-codex-acp${ext}" 2>/dev/null || echo "Failed to make binary executable"
+  chmod +x "${pkg_dir}/bin/xsfire-camp${ext}" 2>/dev/null || echo "Failed to make binary executable"
 
   # Create package.json from template
   export PACKAGE_NAME="$pkg_name"
@@ -79,7 +79,7 @@ for target in "${!platforms[@]}"; do
   # Update bin field for Windows to include .exe extension
   if [[ "$os" == "win32" ]]; then
     # Use sed to update the bin path in package.json
-    sed -i.bak 's|"bin/theprometheus-codex-acp"|"bin/theprometheus-codex-acp.exe"|' "${pkg_dir}/package.json"
+    sed -i.bak 's|"bin/xsfire-camp"|"bin/xsfire-camp.exe"|' "${pkg_dir}/package.json"
     rm "${pkg_dir}/package.json.bak"
   fi
 

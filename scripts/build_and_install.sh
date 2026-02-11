@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INSTALL_PATH="${INSTALL_PATH:-$HOME/.local/bin/theprometheus-codex-acp}"
+INSTALL_PATH="${INSTALL_PATH:-$HOME/.local/bin/xsfire-camp}"
 
 CARGO_HOME_VALUE="${CARGO_HOME:-}"
 CARGO_TARGET_DIR_VALUE="${CARGO_TARGET_DIR:-}"
@@ -26,9 +26,9 @@ fi
   fi
 )
 
-BIN_PATH="$ROOT_DIR/target/release/theprometheus-codex-acp"
+BIN_PATH="$ROOT_DIR/target/release/xsfire-camp"
 if [[ -n "$CARGO_TARGET_DIR_VALUE" ]]; then
-  BIN_PATH="$CARGO_TARGET_DIR_VALUE/release/theprometheus-codex-acp"
+  BIN_PATH="$CARGO_TARGET_DIR_VALUE/release/xsfire-camp"
 fi
 
 if [[ ! -f "$BIN_PATH" ]]; then
@@ -37,7 +37,7 @@ if [[ ! -f "$BIN_PATH" ]]; then
 fi
 
 INSTALL_DIR="$(dirname "$INSTALL_PATH")"
-TMP_PATH="$INSTALL_DIR/.theprometheus-codex-acp.tmp.$$"
+TMP_PATH="$INSTALL_DIR/.xsfire-camp.tmp.$$"
 
 # Install via atomic rename so we don't follow an existing symlink target.
 cp -f "$BIN_PATH" "$TMP_PATH"

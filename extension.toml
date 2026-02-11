@@ -1,35 +1,35 @@
-id = "theprometheus-codex-acp"
-name = "thePrometheus Codex ACP"
-version = "0.9.4"
+id = "xsfire-camp"
+name = "xsfire-camp"
+version = "0.9.5"
 schema_version = 1
 authors = ["haegyung"]
-description = "Codex CLI parity ACP adapter with shared CODEX_HOME."
+description = "ACP IDE bridge for Codex CLI sessions with structured tool/plan/approval logs; Codex-only now, designed for multi-backend CLI expansion."
 repository = "https://github.com/haegyung/theP_codex"
 
-[agent_servers.theprometheus]
-name = "thePrometheus Codex ACP"
-icon = "icons/theprometheus.svg"
+[agent_servers.xsfire_camp]
+name = "xsfire-camp"
+icon = "icons/xsfire-camp.svg"
 
-[agent_servers.theprometheus.targets.darwin-aarch64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-aarch64-apple-darwin.tar.gz"
-cmd = "./theprometheus-codex-acp"
+[agent_servers.xsfire_camp.targets.darwin-aarch64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-apple-darwin.tar.gz"
+cmd = "./xsfire-camp"
 
-[agent_servers.theprometheus.targets.darwin-x86_64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-x86_64-apple-darwin.tar.gz"
-cmd = "./theprometheus-codex-acp"
+[agent_servers.xsfire_camp.targets.darwin-x86_64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-apple-darwin.tar.gz"
+cmd = "./xsfire-camp"
 
-[agent_servers.theprometheus.targets.linux-x86_64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-x86_64-unknown-linux-gnu.tar.gz"
-cmd = "./theprometheus-codex-acp"
+[agent_servers.xsfire_camp.targets.linux-x86_64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-unknown-linux-gnu.tar.gz"
+cmd = "./xsfire-camp"
 
-[agent_servers.theprometheus.targets.linux-aarch64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-aarch64-unknown-linux-gnu.tar.gz"
-cmd = "./theprometheus-codex-acp"
+[agent_servers.xsfire_camp.targets.linux-aarch64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-unknown-linux-gnu.tar.gz"
+cmd = "./xsfire-camp"
 
-[agent_servers.theprometheus.targets.windows-x86_64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-x86_64-pc-windows-msvc.zip"
-cmd = "theprometheus-codex-acp.exe"
+[agent_servers.xsfire_camp.targets.windows-x86_64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-pc-windows-msvc.zip"
+cmd = "xsfire-camp.exe"
 
-[agent_servers.theprometheus.targets.windows-aarch64]
-archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.4/theprometheus-codex-acp-0.9.4-aarch64-pc-windows-msvc.zip"
-cmd = "theprometheus-codex-acp.exe"
+[agent_servers.xsfire_camp.targets.windows-aarch64]
+archive = "https://github.com/haegyung/theP_codex/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-pc-windows-msvc.zip"
+cmd = "xsfire-camp.exe"

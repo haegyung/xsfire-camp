@@ -1,8 +1,8 @@
 {
-	"name": "@haegyung/theprometheus-codex-acp",
-	"version": "0.9.4",
+	"name": "@haegyung/xsfire-camp",
+	"version": "0.9.5",
 	"type": "module",
-	"description": "An ACP-compatible coding agent powered by Codex",
+	"description": "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends.",
 	"license": "Apache-2.0",
 	"author": "haegyung <g@theprometheus.xyz>",
 	"homepage": "https://github.com/haegyung/theP_codex",
@@ -22,17 +22,17 @@
 		"assistant"
 	],
 	"bin": {
-		"theprometheus-codex-acp": "bin/theprometheus-codex-acp.js"
+		"xsfire-camp": "bin/xsfire-camp.js"
 	},
 	"files": [
 		"bin"
 	],
 	"optionalDependencies": {
-		"@haegyung/theprometheus-codex-acp-darwin-arm64": "0.9.4",
-		"@haegyung/theprometheus-codex-acp-darwin-x64": "0.9.4",
-		"@haegyung/theprometheus-codex-acp-linux-arm64": "0.9.4",
-		"@haegyung/theprometheus-codex-acp-linux-x64": "0.9.4",
-		"@haegyung/theprometheus-codex-acp-win32-arm64": "0.9.4",
-		"@haegyung/theprometheus-codex-acp-win32-x64": "0.9.4"
+		"@haegyung/xsfire-camp-darwin-arm64": "0.9.5",
+		"@haegyung/xsfire-camp-darwin-x64": "0.9.5",
+		"@haegyung/xsfire-camp-linux-arm64": "0.9.5",
+		"@haegyung/xsfire-camp-linux-x64": "0.9.5",
+		"@haegyung/xsfire-camp-win32-arm64": "0.9.5",
+		"@haegyung/xsfire-camp-win32-x64": "0.9.5"
 	}
 }

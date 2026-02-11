@@ -1,19 +1,19 @@
 [package]
-name = "theprometheus-codex-acp"
-version = "0.9.4"
+name = "xsfire-camp"
+version = "0.9.5"
 edition = "2024"
 authors = ["haegyung <g@theprometheus.xyz>"]
 license = "Apache-2.0"
-description = "An ACP-compatible coding agent powered by Codex"
+description = "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends."
 repository = "https://github.com/haegyung/theP_codex"
 homepage = "https://github.com/haegyung/theP_codex"
 
 [[bin]]
-name = "theprometheus-codex-acp"
+name = "xsfire-camp"
 path = "src/main.rs"
 
 [lib]
-name = "theprometheus_codex_acp"
+name = "xsfire_camp"
 path = "src/lib.rs"
 
 [dependencies]

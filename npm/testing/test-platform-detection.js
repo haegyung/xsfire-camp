@@ -10,16 +10,16 @@ function getPlatformPackage() {
 
 	const platformMap = {
 		darwin: {
-			arm64: "theprometheus-codex-acp-darwin-arm64",
-			x64: "theprometheus-codex-acp-darwin-x64",
+			arm64: "xsfire-camp-darwin-arm64",
+			x64: "xsfire-camp-darwin-x64",
 		},
 		linux: {
-			arm64: "theprometheus-codex-acp-linux-arm64",
-			x64: "theprometheus-codex-acp-linux-x64",
+			arm64: "xsfire-camp-linux-arm64",
+			x64: "xsfire-camp-linux-x64",
 		},
 		win32: {
-			arm64: "theprometheus-codex-acp-win32-arm64",
-			x64: "theprometheus-codex-acp-win32-x64",
+			arm64: "xsfire-camp-win32-arm64",
+			x64: "xsfire-camp-win32-x64",
 		},
 	};
 
@@ -44,32 +44,32 @@ function testAllPlatforms() {
 		{
 			platform: "darwin",
 			arch: "arm64",
-			expected: "theprometheus-codex-acp-darwin-arm64",
+			expected: "xsfire-camp-darwin-arm64",
 		},
 		{
 			platform: "darwin",
 			arch: "x64",
-			expected: "theprometheus-codex-acp-darwin-x64",
+			expected: "xsfire-camp-darwin-x64",
 		},
 		{
 			platform: "linux",
 			arch: "arm64",
-			expected: "theprometheus-codex-acp-linux-arm64",
+			expected: "xsfire-camp-linux-arm64",
 		},
 		{
 			platform: "linux",
 			arch: "x64",
-			expected: "theprometheus-codex-acp-linux-x64",
+			expected: "xsfire-camp-linux-x64",
 		},
 		{
 			platform: "win32",
 			arch: "arm64",
-			expected: "theprometheus-codex-acp-win32-arm64",
+			expected: "xsfire-camp-win32-arm64",
 		},
 		{
 			platform: "win32",
 			arch: "x64",
-			expected: "theprometheus-codex-acp-win32-x64",
+			expected: "xsfire-camp-win32-x64",
 		},
 	];
 

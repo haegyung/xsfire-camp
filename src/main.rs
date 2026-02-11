@@ -71,7 +71,7 @@ fn main() -> Result<()> {
         }
 
         let cli_config_overrides = CliConfigOverrides::parse_from(args);
-        theprometheus_codex_acp::run_main(codex_linux_sandbox_exe, cli_config_overrides).await?;
+        xsfire_camp::run_main(codex_linux_sandbox_exe, cli_config_overrides).await?;
         Ok(())
     })
 }

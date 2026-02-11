@@ -5184,36 +5184,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "theprometheus-codex-acp"
-version = "0.9.4"
-dependencies = [
- "agent-client-protocol",
- "anyhow",
- "async-trait",
- "clap",
- "codex-apply-patch",
- "codex-arg0",
- "codex-common",
- "codex-core",
- "codex-login",
- "codex-mcp-server",
- "codex-protocol",
- "heck",
- "itertools 0.14.0",
- "mcp-types",
- "regex-lite",
- "serde",
- "serde_json",
- "shlex",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "unicode-segmentation",
- "uuid",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6572,6 +6542,36 @@ checksum = "ec1cdab258fb55c0da61328dc52c8764709b249011b2cad0454c72f0bf10a1f6"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "xsfire-camp"
+version = "0.9.5"
+dependencies = [
+ "agent-client-protocol",
+ "anyhow",
+ "async-trait",
+ "clap",
+ "codex-apply-patch",
+ "codex-arg0",
+ "codex-common",
+ "codex-core",
+ "codex-login",
+ "codex-mcp-server",
+ "codex-protocol",
+ "heck",
+ "itertools 0.14.0",
+ "mcp-types",
+ "regex-lite",
+ "serde",
+ "serde_json",
+ "shlex",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-segmentation",
+ "uuid",
 ]
 
 [[package]]
