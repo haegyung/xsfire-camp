@@ -12,5 +12,30 @@ icon = "icons/xsfire-camp.svg"
 
 [agent_servers.xsfire_camp.targets.darwin-aarch64]
 archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-apple-darwin.tar.gz"
-sha256 = "cd59a883a362fc45ba469548b174875a3b94c2e60c545979fa53e7327e541a7c"
+sha256 = "8cb92e32add546bd8829b071f5d01265b0d67f3d7eaecd499c107b1ef3b5b8e4"
 cmd = "./xsfire-camp"
+
+[agent_servers.xsfire_camp.targets.darwin-x86_64]
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-apple-darwin.tar.gz"
+sha256 = "6c061ae4f8bbf7de908460d26df074d152aef30810ab5693af31968dfa58b9a5"
+cmd = "./xsfire-camp"
+
+[agent_servers.xsfire_camp.targets.linux-x86_64]
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-unknown-linux-gnu.tar.gz"
+sha256 = "f9b4db2c85f8b71bce5803c95cc939a2b4fffa6201283379d96ac7fb4a338299"
+cmd = "./xsfire-camp"
+
+[agent_servers.xsfire_camp.targets.linux-aarch64]
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-unknown-linux-gnu.tar.gz"
+sha256 = "500ad4af093c562f40042d9af6619e5c71bb8a0afad29691e36bb68894815716"
+cmd = "./xsfire-camp"
+
+[agent_servers.xsfire_camp.targets.windows-x86_64]
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-x86_64-pc-windows-msvc.zip"
+sha256 = "e69c0aac5e97d46d4c56e1603365087011e1ad8eae15685dbbb3c5a813d65703"
+cmd = "xsfire-camp.exe"
+
+[agent_servers.xsfire_camp.targets.windows-aarch64]
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.5/xsfire-camp-0.9.5-aarch64-pc-windows-msvc.zip"
+sha256 = "a8675bd045e2c098e53a0755d1d9a0cdc92909bf6c815502a351146572e92516"
+cmd = "xsfire-camp.exe"

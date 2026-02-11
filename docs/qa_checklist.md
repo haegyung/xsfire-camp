@@ -11,14 +11,14 @@ Use this checklist before tagging/publishing the extension release.
    - [x] `cargo test` (unit tests and event coverage) passes locally.
    - [x] `TaskState` delegates to `PromptState` to reuse event handling.
 3. **Zed-specific**
-   - [x] `extension.toml` references live v0.9.5 binary for `darwin-aarch64` with `sha256`.
+   - [x] `extension.toml` references live v0.9.5 binaries for darwin/linux/windows targets with `sha256`.
    - [x] `docs/extensions_toml_sample.md` updated to v0.9.5 entry format.
    - [x] PR body template updated in `docs/zed_extension_pr_template.md`.
 4. **Release Artifacts**
-   - [ ] Cargo/npm versions bumped consistently (`Cargo.toml`, `npm/package.json`).
+   - [x] Cargo/npm versions are consistent (`Cargo.toml` = `0.9.5`, `npm/package.json` = `0.9.5`).
    - [x] `v0.9.5` tag exists.
-   - [x] GitHub Release `v0.9.5` created with darwin-aarch64 asset upload.
-   - [ ] Additional target assets (`darwin-x86_64`, `linux-*`, `windows-*`) uploaded.
+   - [x] GitHub Release `v0.9.5` created.
+   - [x] Additional target assets (`darwin-x86_64`, `linux-*`, `windows-*`) uploaded.
 5. **Manual verification**
    - [ ] Launch ACP with `CODEX_HOME` pointing to CLI home and run `/review`, `/compact`, `/undo`.
    - [ ] Inspect `logs/codex_chats/...` for `Plan`, `ToolCall`, and `RequestPermission` entries.
