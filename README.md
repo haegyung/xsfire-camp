@@ -25,7 +25,7 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 - Tool calls(쉘 실행, apply_patch, 웹 검색, MCP tool call 등) 스트리밍 및 결과 업데이트
 - 승인(Approvals) 플로우: 실행/패치 등 위험 동작을 `RequestPermission`으로 노출하고 사용자 선택을 반영
 - Plan/TODO/Terminal 등 “작업 진행” 신호를 ACP `SessionUpdate`로 전달
-- Codex CLI parity 중심의 slash commands 지원: `/setup`, `/review`, `/compact`, `/undo`, `/init`, `/sessions`, `/load`, `/mcp`, `/skills` 등
+- Codex CLI parity 중심의 slash commands 지원: `/setup`, `/review`, `/compact`, `/undo`, `/init`, `/sessions`, `/load`, `/mcp`, `/skills` 등 (TIP: `/setup`은 Plan 패널에 체크리스트를 표시합니다)
 - 모니터링/UX 보조: `/monitor`(플랜/컨텍스트 사용량/트레이스), `/vector`(워크플로 방향 미니맵/나침반), `/new-window`(새 스레드 안내), `/experimental`(베타 기능 토글 안내)
 - Custom prompts: 저장된 prompt를 `/name KEY=value` 형태로 호출, `$1..$9`, `$ARGUMENTS` 및 named placeholder 지원
 - MCP 서버 병합: ACP 클라이언트가 제공한 MCP 서버(HTTP/stdio)를 codex-rs 설정에 병합
@@ -48,8 +48,8 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 
 ### 로드맵 (요약)
 
-- 지금: Codex CLI를 ACP 에이전트로 연결하고 `CODEX_HOME`을 공유해 IDE/CLI 간 세션을 이어갑니다.
-- 다음: backend driver(드라이버) 구조로 분리해 Claude Code/Gemini CLI 같은 **CLI 기반 백엔드**를 추가하고, 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존합니다.
+- 지금: backend driver(드라이버) 경계로 분리하고 `--backend` 플래그를 추가했습니다(현재 `codex`만 구현). Codex CLI를 ACP 에이전트로 연결하고 `CODEX_HOME`을 공유해 IDE/CLI 간 세션을 이어갑니다.
+- 다음: Claude Code/Gemini CLI 같은 **CLI 기반 백엔드** 드라이버를 구현하고, 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존합니다.
 - 나중: canonical 로그 스키마/상관관계 ID/보안(레닥션) 정책을 강화해 “모델이 바뀌어도” 작업 맥락을 더 안정적으로 이어가게 합니다.
 
 자세한 계획: `docs/roadmap.md`, `docs/backends.md`, `docs/session_store.md`, `docs/policies.md`.
@@ -104,6 +104,19 @@ target/release/xsfire-camp
 ```
 OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 ```
+
+백엔드 선택(기본값: `codex`):
+
+```
+target/release/xsfire-camp --backend=codex
+target/release/xsfire-camp --backend=claude-code
+target/release/xsfire-camp --backend=gemini
+```
+
+참고:
+
+- `claude-code`/`gemini` 백엔드는 현재 최소 구현(원샷 프롬프트 위주)입니다. `claude`/`gemini` CLI가 설치되어 있고, CLI 자체에서 인증이 완료되어 있어야 합니다.
+- 필요하면 실행 바이너리/추가 플래그를 env로 오버라이드할 수 있습니다: `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`, `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE`.
 
 ### Zed (custom agent registration)
 

@@ -1,10 +1,8 @@
 use agent_client_protocol::{
-    Agent, AgentCapabilities, AuthMethod, AuthMethodId, AuthenticateRequest, AuthenticateResponse,
-    CancelNotification, ClientCapabilities, Error, Implementation, InitializeRequest,
-    InitializeResponse, ListSessionsRequest, ListSessionsResponse, LoadSessionRequest,
-    LoadSessionResponse, McpCapabilities, McpServer, McpServerHttp, McpServerStdio,
-    NewSessionRequest, NewSessionResponse, PromptCapabilities, PromptRequest, PromptResponse,
-    ProtocolVersion, SessionCapabilities, SessionId, SessionInfo, SessionListCapabilities,
+    AuthMethod, AuthMethodId, AuthenticateRequest, AuthenticateResponse, CancelNotification,
+    ClientCapabilities, Error, ListSessionsRequest, ListSessionsResponse, LoadSessionRequest,
+    LoadSessionResponse, McpServer, McpServerHttp, McpServerStdio, NewSessionRequest,
+    NewSessionResponse, PromptRequest, PromptResponse, SessionId, SessionInfo,
     SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, SetSessionModeRequest,
     SetSessionModeResponse, SetSessionModelRequest, SetSessionModelResponse,
 };
@@ -31,16 +29,17 @@ use tracing::{debug, info};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
+    backend::{BackendDriver, BackendKind},
     local_spawner::{AcpFs, LocalSpawner},
     session_store::{GlobalSessionIndex, SessionStore},
     thread::Thread,
 };
 
-/// The Codex implementation of the ACP Agent trait.
+/// Codex backend driver for ACP.
 ///
 /// This bridges the ACP protocol with the existing codex-rs infrastructure,
-/// allowing codex to be used as an ACP agent.
-pub struct CodexAgent {
+/// allowing Codex to be used as an ACP backend behind a stable driver interface.
+pub struct CodexDriver {
     /// Handle to the current authentication
     auth_manager: Arc<AuthManager>,
     /// Capabilities of the connected client
@@ -62,16 +61,14 @@ pub struct CodexAgent {
 const SESSION_LIST_PAGE_SIZE: usize = 25;
 const SESSION_TITLE_MAX_GRAPHEMES: usize = 120;
 
-impl CodexAgent {
-    /// Create a new `CodexAgent` with the given configuration
-    pub fn new(config: Config) -> Self {
+impl CodexDriver {
+    /// Create a new `CodexDriver` with the given configuration.
+    pub fn new(config: Config, client_capabilities: Arc<Mutex<ClientCapabilities>>) -> Self {
         let auth_manager = AuthManager::shared(
             config.codex_home.clone(),
             false,
             config.cli_auth_credentials_store_mode,
         );
-
-        let client_capabilities: Arc<Mutex<ClientCapabilities>> = Arc::default();
 
         let local_spawner = LocalSpawner::new();
         let capabilities_clone = client_capabilities.clone();
@@ -210,43 +207,22 @@ impl CodexAgent {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Agent for CodexAgent {
-    async fn initialize(&self, request: InitializeRequest) -> Result<InitializeResponse, Error> {
-        let InitializeRequest {
-            protocol_version,
-            client_capabilities,
-            client_info: _, // TODO: save and pass into Codex somehow
-            ..
-        } = request;
-        debug!("Received initialize request with protocol version {protocol_version:?}",);
-        let protocol_version = ProtocolVersion::V1;
+impl BackendDriver for CodexDriver {
+    fn backend_kind(&self) -> BackendKind {
+        BackendKind::Codex
+    }
 
-        *self.client_capabilities.lock().unwrap() = client_capabilities;
-
-        let mut agent_capabilities = AgentCapabilities::new()
-            .prompt_capabilities(PromptCapabilities::new().embedded_context(true).image(true))
-            .mcp_capabilities(McpCapabilities::new().http(true))
-            .load_session(true);
-
-        agent_capabilities.session_capabilities =
-            SessionCapabilities::new().list(SessionListCapabilities::new());
-
+    fn auth_methods(&self) -> Vec<AuthMethod> {
         let mut auth_methods = vec![
             CodexAuthMethod::ChatGpt.into(),
             CodexAuthMethod::CodexApiKey.into(),
             CodexAuthMethod::OpenAiApiKey.into(),
         ];
-        // Until codex device code auth works, we can't use this in remote ssh projects
+        // Until codex device code auth works, we can't use this in remote ssh projects.
         if std::env::var("NO_BROWSER").is_ok() {
             auth_methods.remove(0);
         }
-
-        Ok(InitializeResponse::new(protocol_version)
-            .agent_capabilities(agent_capabilities)
-            .agent_info(
-                Implementation::new("xsfire-camp", env!("CARGO_PKG_VERSION")).title("xsfire-camp"),
-            )
-            .auth_methods(auth_methods))
+        auth_methods
     }
 
     async fn authenticate(

@@ -12,6 +12,8 @@ use tracing::{error, warn};
 use uuid::Uuid;
 
 static SECRET_REDACTION_RE: OnceLock<Regex> = OnceLock::new();
+#[cfg(test)]
+pub(crate) static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 fn secret_redaction_re() -> &'static Regex {
     SECRET_REDACTION_RE.get_or_init(|| {
@@ -264,13 +266,10 @@ impl SessionStore {
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::sync::{Mutex as StdMutex, OnceLock as StdOnceLock};
-
-    static ENV_LOCK: StdOnceLock<StdMutex<()>> = StdOnceLock::new();
 
     #[test]
     fn writes_canonical_log_and_redacts_secrets() {
-        let _guard = ENV_LOCK.get_or_init(|| StdMutex::new(())).lock().unwrap();
+        let _guard = ENV_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap();
 
         let root = std::env::temp_dir().join(format!("acp-session-store-test-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();

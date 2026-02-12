@@ -3,23 +3,7 @@ use clap::Parser;
 use codex_arg0::arg0_dispatch_or_else;
 use codex_common::CliConfigOverrides;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BackendKind {
-    Codex,
-    ClaudeCode,
-    Gemini,
-}
-
-impl BackendKind {
-    fn parse(s: &str) -> Option<Self> {
-        match s {
-            "codex" => Some(Self::Codex),
-            "claude-code" | "claude" => Some(Self::ClaudeCode),
-            "gemini" | "gemini-cli" => Some(Self::Gemini),
-            _ => None,
-        }
-    }
-}
+use xsfire_camp::backend::BackendKind;
 
 fn extract_backend_arg(args: &mut Vec<std::ffi::OsString>) -> anyhow::Result<BackendKind> {
     // Default to codex to preserve current behavior.
@@ -66,12 +50,9 @@ fn main() -> Result<()> {
         }
 
         let backend = extract_backend_arg(&mut args)?;
-        if backend != BackendKind::Codex {
-            anyhow::bail!("backend not supported yet: {backend:?} (current: codex only).");
-        }
 
         let cli_config_overrides = CliConfigOverrides::parse_from(args);
-        xsfire_camp::run_main(codex_linux_sandbox_exe, cli_config_overrides).await?;
+        xsfire_camp::run_main(codex_linux_sandbox_exe, cli_config_overrides, backend).await?;
         Ok(())
     })
 }

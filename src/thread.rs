@@ -374,7 +374,7 @@ impl Default for ContextOptimizationState {
         let mode = std::env::var("ACP_CONTEXT_OPT_MODE")
             .ok()
             .and_then(|raw| ContextOptimizationMode::from_config_value(raw.trim()).ok())
-            .unwrap_or(ContextOptimizationMode::Off);
+            .unwrap_or(ContextOptimizationMode::Monitor);
 
         let trigger_percent = std::env::var("ACP_CONTEXT_OPT_TRIGGER_PERCENT")
             .ok()
@@ -914,7 +914,7 @@ impl PromptState {
             EventMsg::PlanUpdate(UpdatePlanArgs { explanation, plan }) => {
                 // Send this to the client via session/update notification
                 info!("Agent plan updated. Explanation: {:?}", explanation);
-                client.update_plan(plan).await;
+                client.update_plan(plan, explanation).await;
             }
             EventMsg::WebSearchBegin(WebSearchBeginEvent { call_id }) => {
                 info!("Web search started: call_id={}", call_id);
@@ -2003,22 +2003,23 @@ impl SessionClient {
             .await;
     }
 
-    async fn update_plan(&self, plan: Vec<PlanItemArg>) {
-        self.log_canonical(
-            "acp.plan",
-            json!({
-                "items": plan.iter().map(|p| {
-                    json!({
-                        "step": p.step,
-                        "status": match p.status {
-                            StepStatus::Pending => "pending",
-                            StepStatus::InProgress => "in_progress",
-                            StepStatus::Completed => "completed",
-                        }
-                    })
-                }).collect::<Vec<_>>(),
-            }),
-        );
+    async fn update_plan(&self, plan: Vec<PlanItemArg>, explanation: Option<String>) {
+        let mut data = json!({
+            "items": plan.iter().map(|p| {
+                json!({
+                    "step": p.step,
+                    "status": match p.status {
+                        StepStatus::Pending => "pending",
+                        StepStatus::InProgress => "in_progress",
+                        StepStatus::Completed => "completed",
+                    }
+                })
+            }).collect::<Vec<_>>(),
+        });
+        if let Some(explanation) = explanation {
+            data["explanation"] = serde_json::Value::String(explanation);
+        }
+        self.log_canonical("acp.plan", data);
         self.send_notification(SessionUpdate::Plan(Plan::new(
             plan.into_iter()
                 .map(|entry| {
@@ -2910,6 +2911,7 @@ impl<A: Auth> ThreadActor<A> {
     fn render_setup_wizard_message(&self) -> String {
         let mut lines = Vec::new();
         lines.push("xsfire-camp setup wizard".to_string());
+        lines.push("(See the Plan panel for the step-by-step checklist.)".to_string());
         lines.push(String::new());
         lines.push("1) Authentication".to_string());
         lines.push(
@@ -2937,7 +2939,10 @@ impl<A: Auth> ThreadActor<A> {
         ));
         lines
             .push("- Use `/monitor` to observe token usage estimates + plan progress.".to_string());
-        lines.push("- Set `Context Optimization` to `Monitor` or `Auto` if you want telemetry/auto-compaction.".to_string());
+        lines.push(
+            "- Context Optimization defaults to `Monitor` (telemetry only). Set it to `Auto` if you want auto-compaction."
+                .to_string(),
+        );
         lines.push(String::new());
         lines.push("5) UX helpers".to_string());
         lines.push("- `/monitor detail`: progress + trace + context telemetry".to_string());
@@ -2949,6 +2954,75 @@ impl<A: Auth> ThreadActor<A> {
         lines.push("- Run: `/monitor`".to_string());
         lines.push("- If needed: open Config Options and adjust settings above.".to_string());
         lines.join("\n")
+    }
+
+    fn setup_wizard_plan_items(&self) -> Vec<PlanItemArg> {
+        let mut items = Vec::new();
+
+        // Authentication: if the session exists, the driver already passed `check_auth()` for
+        // providers that require it. Mark this as completed to keep the wizard actionable.
+        items.push(PlanItemArg {
+            step: "Setup: authentication".to_string(),
+            status: StepStatus::Completed,
+        });
+
+        let model_status = if self
+            .config
+            .model
+            .as_ref()
+            .is_some_and(|m| !m.trim().is_empty())
+        {
+            StepStatus::Completed
+        } else {
+            StepStatus::Pending
+        };
+        items.push(PlanItemArg {
+            step: "Setup: choose model".to_string(),
+            status: model_status,
+        });
+
+        let effort_status = if self.config.model_reasoning_effort.is_some() {
+            StepStatus::Completed
+        } else {
+            StepStatus::Pending
+        };
+        items.push(PlanItemArg {
+            step: "Setup: choose reasoning effort".to_string(),
+            status: effort_status,
+        });
+
+        // Approval preset always has a value (defaults apply), but we want users to explicitly
+        // choose one so they understand the approvals/sandbox tradeoffs.
+        let approval_status = if self
+            .config
+            .did_user_set_custom_approval_policy_or_sandbox_mode
+        {
+            StepStatus::Completed
+        } else {
+            StepStatus::Pending
+        };
+        items.push(PlanItemArg {
+            step: "Setup: choose approval preset".to_string(),
+            status: approval_status,
+        });
+
+        let context_status =
+            if matches!(self.context_optimization.mode, ContextOptimizationMode::Off) {
+                StepStatus::Pending
+            } else {
+                StepStatus::Completed
+            };
+        items.push(PlanItemArg {
+            step: "Setup: enable context optimization telemetry".to_string(),
+            status: context_status,
+        });
+
+        items.push(PlanItemArg {
+            step: "Verify: run /status and /monitor".to_string(),
+            status: StepStatus::Pending,
+        });
+
+        items
     }
 
     fn render_monitor_message(&self, detail: bool) -> String {
@@ -3168,6 +3242,9 @@ impl<A: Auth> ThreadActor<A> {
                 }
                 "setup" => {
                     self.maybe_emit_config_options_update().await;
+                    self.client
+                        .update_plan(self.setup_wizard_plan_items(), None)
+                        .await;
                     self.client
                         .send_agent_text(self.render_setup_wizard_message())
                         .await;
@@ -3425,6 +3502,8 @@ impl<A: Auth> ThreadActor<A> {
             .sandbox_policy
             .set(preset.sandbox.clone())
             .map_err(|e| Error::from(anyhow::anyhow!(e)))?;
+        self.config
+            .did_user_set_custom_approval_policy_or_sandbox_mode = true;
 
         match preset.sandbox {
             // Treat this user action as a trusted dir
@@ -5012,8 +5091,202 @@ mod tests {
             "notifications don't match {notifications:?}"
         );
 
+        let plan = notifications.iter().find_map(|n| match &n.update {
+            SessionUpdate::Plan(plan) => Some(plan),
+            _ => None,
+        });
+        let Some(plan) = plan else {
+            panic!("expected /setup to emit SessionUpdate::Plan. notifications={notifications:?}");
+        };
+        let steps = plan
+            .entries
+            .iter()
+            .map(|entry| entry.content.as_str())
+            .collect::<Vec<_>>();
+        for expected in [
+            "Setup: authentication",
+            "Setup: choose model",
+            "Setup: choose reasoning effort",
+            "Setup: choose approval preset",
+            "Setup: enable context optimization telemetry",
+            "Verify: run /status and /monitor",
+        ] {
+            assert!(
+                steps.iter().any(|step| *step == expected),
+                "expected plan to include step {expected:?}. steps={steps:?}"
+            );
+        }
+
         let ops = thread.ops.lock().unwrap();
         assert!(ops.is_empty(), "setup command should not submit backend op");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_canonical_log_correlation_path() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        let root =
+            std::env::temp_dir().join(format!("acp-thread-correlation-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root)?;
+
+        // Safe within this test due to ENV_LOCK serialization.
+        unsafe {
+            std::env::set_var("ACP_HOME", &root);
+        }
+
+        let mut idx = crate::session_store::GlobalSessionIndex::load()
+            .expect("ACP_HOME should be resolvable");
+        let global_id = idx.get_or_create("codex:test-thread-correlation").unwrap();
+
+        let store = crate::session_store::SessionStore::init(
+            global_id.clone(),
+            "codex",
+            "acp-session-id",
+            "backend-session-id",
+            Some(Path::new("/tmp/repo")),
+        )
+        .expect("SessionStore should init");
+
+        let session_id = SessionId::new("test");
+        let client = Arc::new(StubClient::new());
+        let session_client = SessionClient::with_client(
+            session_id.clone(),
+            client.clone(),
+            Arc::default(),
+            Some(store),
+        );
+        let conversation = Arc::new(StubCodexThread::new());
+        let models_manager = Arc::new(StubModelsManager);
+        let config = Config::load_with_cli_overrides_and_harness_overrides(
+            vec![],
+            ConfigOverrides::default(),
+        )
+        .await?;
+        let (message_tx, message_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let actor = ThreadActor::new(
+            StubAuth,
+            session_client,
+            conversation,
+            models_manager,
+            config,
+            message_rx,
+        );
+
+        let local_set = LocalSet::new();
+        local_set.spawn_local(actor.spawn());
+
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/diff".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let canonical_path = root
+            .join("sessions")
+            .join(&global_id)
+            .join("canonical.jsonl");
+        let s = std::fs::read_to_string(&canonical_path)?;
+
+        let mut prompt_idx: Option<usize> = None;
+        let mut plan_idx: Option<usize> = None;
+        let mut request_idx: Option<usize> = None;
+        let mut response_idx: Option<usize> = None;
+        let mut tool_call_idx: Option<usize> = None;
+
+        let mut plan_explanation: Option<String> = None;
+        let mut permission_tool_call_id: Option<String> = None;
+        let mut tool_call_id: Option<String> = None;
+
+        for (i, line) in s.lines().enumerate() {
+            let v: serde_json::Value = serde_json::from_str(line)?;
+            let kind = v.get("kind").and_then(|k| k.as_str()).unwrap_or_default();
+            match kind {
+                "acp.prompt" if prompt_idx.is_none() => prompt_idx = Some(i),
+                "acp.plan" if plan_idx.is_none() => {
+                    plan_idx = Some(i);
+                    plan_explanation = v
+                        .pointer("/data/explanation")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                }
+                "acp.request_permission" if request_idx.is_none() => {
+                    request_idx = Some(i);
+                    permission_tool_call_id = v
+                        .pointer("/data/tool_call/toolCallId")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                }
+                "acp.request_permission_response" if response_idx.is_none() => {
+                    response_idx = Some(i)
+                }
+                "acp.tool_call" if tool_call_idx.is_none() => {
+                    tool_call_idx = Some(i);
+                    tool_call_id = v
+                        .pointer("/data/toolCallId")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                }
+                _ => {}
+            }
+        }
+
+        let prompt_idx = prompt_idx.expect("expected acp.prompt event");
+        let plan_idx = plan_idx.expect("expected acp.plan event");
+        let request_idx = request_idx.expect("expected acp.request_permission event");
+        let response_idx = response_idx.expect("expected acp.request_permission_response event");
+        let tool_call_idx = tool_call_idx.expect("expected acp.tool_call event");
+
+        assert!(
+            prompt_idx < plan_idx,
+            "expected acp.prompt before acp.plan. prompt={prompt_idx} plan={plan_idx}"
+        );
+        assert!(
+            plan_idx < request_idx,
+            "expected acp.plan before acp.request_permission. plan={plan_idx} request={request_idx}"
+        );
+        assert!(
+            request_idx < response_idx,
+            "expected acp.request_permission before response. request={request_idx} response={response_idx}"
+        );
+        assert!(
+            response_idx < tool_call_idx,
+            "expected permission response before tool call. response={response_idx} tool_call={tool_call_idx}"
+        );
+
+        assert_eq!(
+            plan_explanation.as_deref(),
+            Some("Test plan explanation"),
+            "expected acp.plan to include explanation"
+        );
+        assert_eq!(
+            permission_tool_call_id, tool_call_id,
+            "expected permission toolCallId to match tool call id"
+        );
+
+        drop(std::fs::remove_dir_all(&root));
+        // Safe within this test due to ENV_LOCK serialization.
+        unsafe {
+            let _ = std::env::remove_var("ACP_HOME");
+        }
 
         Ok(())
     }
@@ -5496,11 +5769,20 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
+    struct PendingExec {
+        call_id: String,
+        command: Vec<String>,
+        cwd: PathBuf,
+        parsed_cmd: Vec<ParsedCommand>,
+    }
+
     struct StubCodexThread {
         current_id: AtomicUsize,
         ops: std::sync::Mutex<Vec<Op>>,
         op_tx: mpsc::UnboundedSender<Event>,
         op_rx: Mutex<mpsc::UnboundedReceiver<Event>>,
+        pending_exec: std::sync::Mutex<std::collections::HashMap<String, PendingExec>>,
     }
 
     impl StubCodexThread {
@@ -5511,6 +5793,7 @@ mod tests {
                 ops: std::sync::Mutex::default(),
                 op_tx,
                 op_rx: Mutex::new(op_rx),
+                pending_exec: std::sync::Mutex::default(),
             }
         }
     }
@@ -5705,6 +5988,127 @@ mod tests {
                         })
                         .unwrap();
                 }
+                Op::RunUserShellCommand { command } => {
+                    let submission_id = id.to_string();
+                    let call_id = format!("exec-{submission_id}");
+                    let cwd = PathBuf::from("/tmp/repo");
+                    let tokens = shlex::split(&command).unwrap_or_else(|| vec![command.clone()]);
+                    let parsed_cmd = vec![ParsedCommand::Unknown { cmd: command }];
+
+                    let pending = PendingExec {
+                        call_id: call_id.clone(),
+                        command: tokens.clone(),
+                        cwd: cwd.clone(),
+                        parsed_cmd: parsed_cmd.clone(),
+                    };
+                    self.pending_exec
+                        .lock()
+                        .unwrap()
+                        .insert(submission_id.clone(), pending);
+
+                    self.op_tx
+                        .send(Event {
+                            id: submission_id.clone(),
+                            msg: EventMsg::PlanUpdate(UpdatePlanArgs {
+                                explanation: Some("Test plan explanation".to_string()),
+                                plan: vec![
+                                    PlanItemArg {
+                                        step: "Test: plan step".to_string(),
+                                        status: StepStatus::InProgress,
+                                    },
+                                    PlanItemArg {
+                                        step: "Test: execute step".to_string(),
+                                        status: StepStatus::Pending,
+                                    },
+                                ],
+                            }),
+                        })
+                        .unwrap();
+
+                    self.op_tx
+                        .send(Event {
+                            id: submission_id,
+                            msg: EventMsg::ExecApprovalRequest(ExecApprovalRequestEvent {
+                                call_id,
+                                turn_id: id.to_string(),
+                                command: tokens,
+                                cwd,
+                                reason: Some("Test: permission required".to_string()),
+                                proposed_execpolicy_amendment: None,
+                                parsed_cmd,
+                            }),
+                        })
+                        .unwrap();
+                }
+                Op::ExecApproval {
+                    id: exec_id,
+                    decision: _,
+                } => {
+                    let pending = self
+                        .pending_exec
+                        .lock()
+                        .unwrap()
+                        .remove(&exec_id)
+                        .unwrap_or_else(|| {
+                            panic!("missing pending exec request for submission id {exec_id}")
+                        });
+
+                    let stdout = "stub exec output\n".to_string();
+                    self.op_tx
+                        .send(Event {
+                            id: exec_id.clone(),
+                            msg: EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
+                                call_id: pending.call_id.clone(),
+                                process_id: None,
+                                turn_id: exec_id.clone(),
+                                command: pending.command.clone(),
+                                cwd: pending.cwd.clone(),
+                                parsed_cmd: pending.parsed_cmd.clone(),
+                                source: codex_core::protocol::ExecCommandSource::UserShell,
+                                interaction_input: None,
+                            }),
+                        })
+                        .unwrap();
+                    self.op_tx
+                        .send(Event {
+                            id: exec_id.clone(),
+                            msg: EventMsg::ExecCommandOutputDelta(ExecCommandOutputDeltaEvent {
+                                call_id: pending.call_id.clone(),
+                                stream: codex_core::protocol::ExecOutputStream::Stdout,
+                                chunk: stdout.as_bytes().to_vec(),
+                            }),
+                        })
+                        .unwrap();
+                    self.op_tx
+                        .send(Event {
+                            id: exec_id.clone(),
+                            msg: EventMsg::ExecCommandEnd(ExecCommandEndEvent {
+                                call_id: pending.call_id,
+                                process_id: None,
+                                turn_id: exec_id.clone(),
+                                command: pending.command,
+                                cwd: pending.cwd,
+                                parsed_cmd: pending.parsed_cmd,
+                                source: codex_core::protocol::ExecCommandSource::UserShell,
+                                interaction_input: None,
+                                stdout: stdout.clone(),
+                                stderr: String::new(),
+                                aggregated_output: stdout.clone(),
+                                exit_code: 0,
+                                duration: std::time::Duration::from_millis(1),
+                                formatted_output: stdout,
+                            }),
+                        })
+                        .unwrap();
+                    self.op_tx
+                        .send(Event {
+                            id: exec_id,
+                            msg: EventMsg::TurnComplete(TurnCompleteEvent {
+                                last_agent_message: None,
+                            }),
+                        })
+                        .unwrap();
+                }
                 _ => {
                     unimplemented!()
                 }
@@ -5738,7 +6142,9 @@ mod tests {
             &self,
             _args: RequestPermissionRequest,
         ) -> Result<RequestPermissionResponse, Error> {
-            unimplemented!()
+            Ok(RequestPermissionResponse::new(
+                RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new("approved")),
+            ))
         }
 
         async fn session_notification(&self, args: SessionNotification) -> Result<(), Error> {

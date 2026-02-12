@@ -5,13 +5,18 @@ use agent_client_protocol::AgentSideConnection;
 use codex_common::CliConfigOverrides;
 use codex_core::config::{Config, ConfigOverrides};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::{io::Result as IoResult, rc::Rc};
 use tokio::task::LocalSet;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use tracing_subscriber::EnvFilter;
 
+mod acp_agent;
+pub mod backend;
+mod claude_code_agent;
+mod cli_common;
 mod codex_agent;
+mod gemini_agent;
 mod local_spawner;
 mod prompt_args;
 mod session_store;
@@ -30,6 +35,7 @@ pub static ACP_CLIENT: OnceLock<Arc<AgentSideConnection>> = OnceLock::new();
 pub async fn run_main(
     codex_linux_sandbox_exe: Option<PathBuf>,
     cli_config_overrides: CliConfigOverrides,
+    backend_kind: backend::BackendKind,
 ) -> IoResult<()> {
     // Install a simple subscriber so `tracing` output is visible.
     // Users can control the log level with `RUST_LOG`.
@@ -61,8 +67,20 @@ pub async fn run_main(
                 )
             })?;
 
-    // Create our Agent implementation with notification channel
-    let agent = Rc::new(codex_agent::CodexAgent::new(config));
+    let client_capabilities: Arc<Mutex<agent_client_protocol::ClientCapabilities>> = Arc::default();
+
+    let driver: Rc<dyn backend::BackendDriver> = match backend_kind {
+        backend::BackendKind::Codex => Rc::new(codex_agent::CodexDriver::new(
+            config,
+            client_capabilities.clone(),
+        )),
+        backend::BackendKind::ClaudeCode => Rc::new(claude_code_agent::ClaudeCodeDriver::new()),
+        backend::BackendKind::Gemini => Rc::new(gemini_agent::GeminiCliDriver::new()),
+    };
+
+    // Create our Agent implementation with notification channel.
+    // This keeps the ACP surface stable while allowing backend selection internally.
+    let agent = Rc::new(acp_agent::AcpAgent::new(driver, client_capabilities));
 
     let stdin = tokio::io::stdin().compat();
     let stdout = tokio::io::stdout().compat_write();
