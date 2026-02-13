@@ -4124,6 +4124,15 @@ impl<A: Auth> ThreadActor<A> {
         Some((title, kind, locations))
     }
 
+    /// Normalizes tool names that may arrive with provider prefixes.
+    fn normalize_tool_name(name: &str) -> String {
+        if let Some(without_prefix) = name.strip_prefix("functions.") {
+            without_prefix.to_string()
+        } else {
+            name.to_string()
+        }
+    }
+
     /// Convert and send a single ResponseItem as ACP notification(s) during replay.
     /// Only handles tool calls - messages/reasoning are handled via EventMsg.
     async fn replay_response_item(&self, item: &ResponseItem) {
@@ -4136,10 +4145,13 @@ impl<A: Auth> ThreadActor<A> {
                 call_id,
                 ..
             } => {
+                let normalized_name = Self::normalize_tool_name(name.as_str());
                 // Check if this is a shell command - parse it like we do for LocalShellCall
-                if matches!(name.as_str(), "shell" | "container.exec" | "shell_command")
-                    && let Some((title, kind, locations)) =
-                        self.parse_shell_function_call(name, arguments)
+                if matches!(
+                    normalized_name.as_str(),
+                    "shell" | "container.exec" | "shell_command"
+                ) && let Some((title, kind, locations)) =
+                    self.parse_shell_function_call(&normalized_name, arguments)
                 {
                     self.client
                         .send_tool_call(
@@ -4159,7 +4171,7 @@ impl<A: Auth> ThreadActor<A> {
                 self.client
                     .send_completed_tool_call(
                         call_id.clone(),
-                        name.clone(),
+                        normalized_name,
                         ToolKind::Other,
                         serde_json::from_str(arguments).ok(),
                     )
@@ -4220,8 +4232,9 @@ impl<A: Auth> ThreadActor<A> {
                 call_id,
                 ..
             } => {
+                let normalized_name = Self::normalize_tool_name(name.as_str());
                 // Check if this is an apply_patch call - show the patch content
-                if name == "apply_patch"
+                if normalized_name == "apply_patch"
                     && let Some((title, locations, content)) = self.parse_apply_patch_call(input)
                 {
                     self.client
@@ -4241,7 +4254,7 @@ impl<A: Auth> ThreadActor<A> {
                 self.client
                     .send_completed_tool_call(
                         call_id.clone(),
-                        name.clone(),
+                        normalized_name,
                         ToolKind::Other,
                         serde_json::from_str(input).ok(),
                     )
@@ -4961,6 +4974,133 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_normalize_tool_name() {
+        struct TestAuth;
+        impl Auth for TestAuth {
+            fn logout(&self) -> Result<bool, Error> {
+                Ok(true)
+            }
+        }
+
+        assert_eq!(
+            ThreadActor::<TestAuth>::normalize_tool_name("functions.apply_patch"),
+            "apply_patch"
+        );
+        assert_eq!(
+            ThreadActor::<TestAuth>::normalize_tool_name("apply_patch"),
+            "apply_patch"
+        );
+        assert_eq!(
+            ThreadActor::<TestAuth>::normalize_tool_name("functions.shell"),
+            "shell"
+        );
+        assert_eq!(
+            ThreadActor::<TestAuth>::normalize_tool_name("prefix.shell"),
+            "prefix.shell"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_replay_history_normalizes_namespaced_custom_tool_name() -> anyhow::Result<()> {
+        let (_session_id, client, _thread, message_tx, local_set) = setup(vec![]).await?;
+
+        tokio::try_join!(
+            async {
+                let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+                let history = vec![RolloutItem::ResponseItem(ResponseItem::CustomToolCall {
+                    id: None,
+                    status: None,
+                    call_id: "tc-1".to_string(),
+                    name: "functions.apply_patch".to_string(),
+                    input: "{}".to_string(),
+                })];
+                message_tx.send(ThreadMessage::ReplayHistory {
+                    history,
+                    response_tx,
+                })?;
+                response_rx.await??;
+                drop(message_tx);
+                Ok::<(), anyhow::Error>(())
+            },
+            async {
+                local_set.await;
+                Ok::<(), anyhow::Error>(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let mut found = false;
+        for notification in notifications.iter() {
+            if let SessionUpdate::ToolCall(tool_call) = &notification.update {
+                if tool_call.title == "apply_patch" {
+                    found = true;
+                }
+            }
+        }
+        assert!(
+            found,
+            "expected replay to emit normalized tool-call title. notifications: {notifications:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_replay_history_normalizes_namespaced_function_tool_name() -> anyhow::Result<()> {
+        let (_session_id, client, _thread, message_tx, local_set) = setup(vec![]).await?;
+
+        tokio::try_join!(
+            async {
+                let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+                let history = vec![RolloutItem::ResponseItem(ResponseItem::FunctionCall {
+                    id: None,
+                    name: "functions.shell_command".to_string(),
+                    arguments: serde_json::json!({
+                        "command": "echo hello"
+                    })
+                    .to_string(),
+                    call_id: "tc-func-1".to_string(),
+                })];
+                message_tx.send(ThreadMessage::ReplayHistory {
+                    history,
+                    response_tx,
+                })?;
+                response_rx.await??;
+                drop(message_tx);
+                Ok::<(), anyhow::Error>(())
+            },
+            async {
+                local_set.await;
+                Ok::<(), anyhow::Error>(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let mut found = false;
+        for notification in notifications.iter() {
+            if let SessionUpdate::ToolCall(tool_call) = &notification.update {
+                if tool_call.tool_call_id.0.as_ref() == "tc-func-1" {
+                    found = true;
+                    assert_ne!(
+                        tool_call.title, "functions.shell",
+                        "expected normalized function title. notifications: {notifications:?}"
+                    );
+                    assert_ne!(
+                        tool_call.title, "functions.shell_command",
+                        "expected normalized function title. notifications: {notifications:?}"
+                    );
+                }
+            }
+        }
+        assert!(
+            found,
+            "expected replay to emit function tool call. notifications: {notifications:?}"
+        );
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_prompt() -> anyhow::Result<()> {
