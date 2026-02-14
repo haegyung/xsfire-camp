@@ -41,3 +41,7 @@ Mark each step when complete and keep the checklist with the release notes for t
   - keyboard focus order + outline visibility
   - contrast check on text and brand backgrounds
   - `forced-colors` and reduced-motion pass-through
+- [ ] `docs/design-system/fluent-demo.html` smoke check:
+  - 버튼/입력 렌더 상태(기본/호버/비활성) 확인
+  - `Tab` 포커스에서 outline/강조가 `--ms-focus-*`로 표시되는지 확인
+  - 테마 전환 시 토큰 스와치(`brand-background`, `surface-card`, `focus-color`) 값이 반영되는지 확인

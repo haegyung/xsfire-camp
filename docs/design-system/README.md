@@ -30,21 +30,56 @@
 
 ## 사용 예시
 
+### React 래퍼 마이그레이션 샘플 (MsButton/MsInput/MsDialog)
+
 ```tsx
-import { MsFluentTheme, MsButton, MsInput, MsCard, MsDialog } from './design-system/fluent-wrappers';
-import './design-system/fluent-theme.css';
+import * as React from 'react';
+import {
+  MsFluentTheme,
+  MsButton,
+  MsInput,
+  MsCard,
+  MsDialog,
+} from './fluent-wrappers';
+import './fluent-theme.css';
 
 export function Demo() {
   const [open, setOpen] = React.useState(false);
+  const [theme, setTheme] = React.useState<'light' | 'dark' | 'highContrast'>('light');
+
   return (
-    <MsFluentTheme theme="light">
-      <MsCard title="Design Token Trial">
-        <MsInput label="Email" placeholder="you@example.com" />
-        <MsButton onClick={() => setOpen(true)}>Open Dialog</MsButton>
-      </MsCard>
-      <MsDialog open={open} onClose={() => setOpen(false)} title="Hello">
-        Fluent 스타일 토큰이 적용된 다이얼로그
-      </MsDialog>
+    <MsFluentTheme theme={theme}>
+      <div>
+        <MsCard title="Theme / Dialog Demo">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <MsButton onClick={() => setTheme('light')}>Light</MsButton>
+            <MsButton onClick={() => setTheme('dark')}>Dark</MsButton>
+            <MsButton onClick={() => setTheme('highContrast')}>High contrast</MsButton>
+          </div>
+
+          <MsInput
+            label="Email"
+            placeholder="you@example.com"
+            helperText="FluentInput 토큰 스타일 예시"
+          />
+
+          <MsInput
+            label="Search"
+            placeholder="검색어를 입력하세요"
+            disabled
+            defaultValue="disabled state sample"
+            helperText="disabled 상태도 토큰으로 제어"
+          />
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <MsButton onClick={() => setOpen(true)}>Open dialog</MsButton>
+          </div>
+        </MsCard>
+
+        <MsDialog open={open} onClose={() => setOpen(false)} title="Fluent Dialog">
+          <p>MsDialog 래퍼에서 렌더되는 접근 가능한 모달입니다.</p>
+        </MsDialog>
+      </div>
     </MsFluentTheme>
   );
 }
