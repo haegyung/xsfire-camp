@@ -2,21 +2,9 @@
 
 기준일: 2026-02-14
 
-## 수집 출처
-- Fluent 2 Design System — Design tokens, layout, color, elevation, motion, typography, iconography, accessibility  
-  - https://fluent2.microsoft.design/design-tokens  
-  - https://fluent2.microsoft.design/typography  
-  - https://fluent2.microsoft.design/layout  
-  - https://fluent2.microsoft.design/elevation  
-  - https://fluent2.microsoft.design/color  
-  - https://fluent2.microsoft.design/motion  
-  - https://fluent2.microsoft.design/iconography  
-  - https://fluent2.microsoft.design/accessibility
-- Fluent UI Web Components — 컴포넌트/토큰 적용 방식, 고대비  
-  - https://learn.microsoft.com/en-us/fluent-ui/web-components/getting-started/styling  
-  - https://learn.microsoft.com/en-us/fluent-ui/web-components/design-system/high-contrast  
-  - https://learn.microsoft.com/en-us/fluent-ui/web-components/components/button  
-  - https://learn.microsoft.com/en-us/fluent-ui/web-components/components/anchor
+## 수집 출처 및 원본 정리
+- 정식 리서치 요약: `docs/design-system/fluent-research-notes.md`
+- 핵심 산출물(적용 스키마): `docs/design-system/MS_FLUENT_TOKEN_SCHEMA.md`
 
 ## 핵심 규격 정리 (요약)
 - 디자인 토큰 2단계 구조

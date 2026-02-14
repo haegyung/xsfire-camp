@@ -9,6 +9,8 @@
 - `fluent-tokens.json`: 샘플 토큰 데이터(경량 예시)
 - `fluent-theme.css`: CSS custom-property 기반 토큰 주입 + 기본 컴포넌트 래퍼 클래스
 - `fluent-wrappers.tsx`: React용 Button/Input/Card/Dialog 래퍼 예시
+- `fluent-research-notes.md`: 공식 문서 리서치 정리
+- `fluent-demo.html`: 토큰/테마 반영을 즉시 확인하는 정적 데모
 
 ## 적용 순서
 
@@ -19,6 +21,12 @@
 5. `docs/` 외부에서 쓰는 경우:
    - 고대비 환경 강제 토글(`forced-colors`) 케이스만 먼저 수동 검증
    - `prefers-reduced-motion` 경로가 깨지지 않는지 확인
+
+## 데모 실행
+
+- 브라우저에서 `docs/design-system/fluent-demo.html` 열기
+- 버튼으로 light/dark/HC 전환 확인
+- 토큰 박스 색상/텍스트 대비/포커스/disabled 상태가 의도대로 표시되는지 체크
 
 ## 사용 예시
 
