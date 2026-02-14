@@ -29,3 +29,15 @@ Use this checklist before tagging/publishing the extension release.
    - [ ] Confirm Zed agent panel (if available) shows plan/tool call updates as expected.
 
 Mark each step when complete and keep the checklist with the release notes for traceability.
+
+### Design System (MS Fluent) Additions (Optional, for UI frontend)
+- [ ] `docs/ms_design_checklist_fluent.md` reviewed and approved.
+- [ ] `docs/design-system/MS_FLUENT_TOKEN_SCHEMA.md` is the source of truth for token keys.
+- [ ] `docs/design-system/fluent-tokens.json` values are synced with runtime tokens.
+- [ ] `docs/design-system/fluent-theme.css` is imported in UI entrypoint and rendered root uses `data-ms-theme`.
+- [ ] `docs/design-system/fluent-wrappers.tsx` is adopted for at least one component surface.
+- [ ] `docs/design-system/README.md` contains migration notes and applied examples.
+- [ ] Accessibility smoke checks include:
+  - keyboard focus order + outline visibility
+  - contrast check on text and brand backgrounds
+  - `forced-colors` and reduced-motion pass-through

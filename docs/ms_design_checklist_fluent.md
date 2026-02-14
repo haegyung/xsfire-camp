@@ -92,7 +92,7 @@
 
 ## 즉시 실행용 체크리스트 (개발자 입력용)
 - [ ] `MS_FLUENT_TOKEN_SCHEMA.md` 파일 생성(토큰 정의 + 사용 규칙).
-- [ ] `ms/fluent.css` 또는 theme provider에서 공통 토큰 주입.
+- [ ] `docs/design-system/fluent-theme.css` 또는 theme provider에서 공통 토큰 주입.
 - [ ] 버튼/입력/카드/링크 우선 리팩터링 → 이후 폼/리스트/모달.
 - [ ] 접근성/고대비/동작 애니메이션 수동 체크리스트를 CI 파이프라인에 한 단계로 연결.
 
