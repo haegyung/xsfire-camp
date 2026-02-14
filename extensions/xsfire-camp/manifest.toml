@@ -1,6 +1,6 @@
 id = "xsfire-camp"
 name = "xsfire-camp"
-version = "0.9.7"
+version = "0.9.8"
 schema_version = 1
 authors = ["haegyung"]
 description = "ACP IDE bridge for Codex CLI sessions with structured tool/plan/approval logs; Codex-only now, designed for multi-backend CLI expansion."
@@ -11,31 +11,31 @@ name = "xsfire-camp"
 icon = "icons/xsfire-camp.svg"
 
 [agent_servers.xsfire_camp.targets.darwin-aarch64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-aarch64-apple-darwin.tar.gz"
-sha256 = "ce915d4642461a22b40f0a248c9d280d72e622b33bdb4d444cfa93d95aa8c123"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-aarch64-apple-darwin.tar.gz"
+sha256 = "a5d2de1b3f8f0cf61f566da7bd9d756cee4bf7e2381883231aeb9ae660fd5686"
 cmd = "./xsfire-camp"
 
 [agent_servers.xsfire_camp.targets.darwin-x86_64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-x86_64-apple-darwin.tar.gz"
-sha256 = "ceb1be5021d142aceb6572222d2fcd92b74ce7269ccefffe383ea6c2468dee92"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-x86_64-apple-darwin.tar.gz"
+sha256 = "f6c9925269a523bc2f4264720c25085f237133b88da65cccfb00904ca39b15c5"
 cmd = "./xsfire-camp"
 
 [agent_servers.xsfire_camp.targets.linux-x86_64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-x86_64-unknown-linux-gnu.tar.gz"
-sha256 = "15ed0010ce7744a4d71612e6795aaaf27490d716b54b49d576ca3bbce2981b57"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-x86_64-unknown-linux-gnu.tar.gz"
+sha256 = "40268b1945b75e00d20e48ecf51c01d22952578ea58a42179365f8ab0150fdec"
 cmd = "./xsfire-camp"
 
 [agent_servers.xsfire_camp.targets.linux-aarch64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-aarch64-unknown-linux-gnu.tar.gz"
-sha256 = "12ae52cc2ec9cd1ea2aec18cd5e545cc91a4091c0f003f9022b2977528062f6c"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-aarch64-unknown-linux-gnu.tar.gz"
+sha256 = "9e93b883db0867047b9d1ed4c9129dc3f32f7302448ae64429f9fe938a53e23a"
 cmd = "./xsfire-camp"
 
 [agent_servers.xsfire_camp.targets.windows-x86_64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-x86_64-pc-windows-msvc.zip"
-sha256 = "59eba6248109680dc577d16ad37b12c570db57fbc65cd285db49309ad0bf42e9"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-x86_64-pc-windows-msvc.zip"
+sha256 = "0678dba29068792c51de1338f2839b2474944a442f8c118f4e86e68bdf6abe43"
 cmd = "xsfire-camp.exe"
 
 [agent_servers.xsfire_camp.targets.windows-aarch64]
-archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.7/xsfire-camp-0.9.7-aarch64-pc-windows-msvc.zip"
-sha256 = "e1b2cf6f517c3659f1b109f245f254a603093a73d290667b729d52a8b31738a0"
+archive = "https://github.com/haegyung/xsfire-camp/releases/download/v0.9.8/xsfire-camp-0.9.8-aarch64-pc-windows-msvc.zip"
+sha256 = "e1890166893768719c97822b174de1595a6f2902a90031715435d481d3bbee5d"
 cmd = "xsfire-camp.exe"
