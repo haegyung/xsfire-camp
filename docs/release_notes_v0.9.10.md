@@ -30,14 +30,16 @@
 
 ## Tests
 - `cargo test`
-  - Expected to pass all tests (re-run now before tagging).
+  - `31 passed` (verified during this release cycle).
 - `scripts/tag_release.sh`
-  - Verifies version/tag consistency and creates/pushes annotated release tag.
+  - Verified version/tag consistency and tag creation/push flow (`v0.9.10`).
 
 ## Versioning / Packaging
-- Tag planned: `v0.9.10`
-- Commit history since `v0.9.9`: `6012948`, `83edaf0`.
+- Tag: `v0.9.10` (published on GitHub Release).
+- Commit history since `v0.9.9`: `6012948`, `83edaf0`, `7e0c885`, `8ada25b`.
 
 ## Traceability
 - `feat: add monitor retrospective reporting mode` — `83edaf0`
 - `chore: sync 0.9.9 manifests and checksums` — `6012948`
+- `chore: bump version to 0.9.10` — `7e0c885`
+- `chore: refresh v0.9.10 release checksums` — `8ada25b`
