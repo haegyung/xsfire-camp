@@ -99,3 +99,9 @@
 ## 참고: 현재 저장소 적용 범위
 - 본 저장소는 현재 CLI/러스트 중심으로 UI 코드가 거의 없으므로, 위 항목은 향후 프론트엔드(예: 위젯/앱/확장 UI) 추가 시 적용 대상으로 두고,  
   지금은 `docs/ms_design_checklist_fluent.md`를 정책 기반 기준 문서로 남기면 된다.
+
+## 실행 산출물
+- [ ] `docs/design-system/MS_FLUENT_TOKEN_SCHEMA.md`로 스키마 정합 검토
+- [ ] `docs/design-system/fluent-tokens.json`로 실제 토큰 데이터 등록
+- [ ] `docs/design-system/fluent-theme.css`로 토큰 주입 + 컴포넌트 기본 클래스 반영
+- [ ] `docs/design-system/fluent-wrappers.tsx`로 Button/Input/Card/Dialog 래퍼 1차 PR

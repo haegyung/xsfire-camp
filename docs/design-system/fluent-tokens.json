@@ -1,0 +1,186 @@
+{
+  "version": "0.1.0",
+  "theme": "light",
+  "tokens": {
+    "color": {
+      "background": {
+        "default": "#fafafa",
+        "subtle": "#f3f4f7",
+        "canvas": "#ffffff"
+      },
+      "foreground": {
+        "default": "#202020",
+        "muted": "#5f6368",
+        "disabled": "#8a9099"
+      },
+      "surface": {
+        "card": "#ffffff",
+        "elevated": "#ffffff",
+        "overlay": "#ffffff",
+        "border": "#d9dee7"
+      },
+      "brand": {
+        "background": "#0078d4",
+        "hover": "#006cbe",
+        "pressed": "#005ba1",
+        "text": "#ffffff",
+        "focus": "#005a9e",
+        "selected": "#deecf9"
+      },
+      "status": {
+        "success": "#107c10",
+        "warning": "#ff8c00",
+        "danger": "#d13438",
+        "info": "#0063b1"
+      },
+      "text": {
+        "default": "#202020",
+        "onBrand": "#ffffff",
+        "disabled": "#8a9099",
+        "link": "#005a9e",
+        "linkHover": "#004578"
+      }
+    },
+    "spacing": {
+      "base4": "4px",
+      "base8": "8px",
+      "base12": "12px",
+      "base16": "16px",
+      "base24": "24px",
+      "base32": "32px",
+      "base48": "48px",
+      "base56": "56px"
+    },
+    "typography": {
+      "family": {
+        "base": "Segoe UI, 'Noto Sans KR', Arial, sans-serif",
+        "code": "Consolas, 'SFMono-Regular', Menlo, monospace",
+        "fallback": "system-ui, -apple-system, Segoe UI, sans-serif"
+      },
+      "size": {
+        "caption": "12px",
+        "body": "14px",
+        "bodyStrong": "14px",
+        "title": "20px",
+        "subtitle": "16px",
+        "display": "24px"
+      },
+      "lineHeight": {
+        "compact": "1.2",
+        "comfortable": "1.4",
+        "loose": "1.6"
+      },
+      "weight": {
+        "regular": "400",
+        "semibold": "600",
+        "bold": "700"
+      },
+      "letterSpacing": {
+        "caption": "0",
+        "body": "0",
+        "title": "-0.01em"
+      }
+    },
+    "radius": {
+      "small": "4px",
+      "medium": "6px",
+      "large": "10px",
+      "full": "9999px"
+    },
+    "stroke": {
+      "thin": "1px",
+      "medium": "2px",
+      "thick": "3px",
+      "focus": "2px"
+    },
+    "focus": {
+      "color": "#0055c8",
+      "width": "2px",
+      "offset": "2px",
+      "style": "solid"
+    },
+    "motion": {
+      "duration": {
+        "fast": "120ms",
+        "normal": "220ms",
+        "slow": "320ms"
+      },
+      "easing": {
+        "enter": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "exit": "cubic-bezier(0.4, 0, 1, 1)"
+      },
+      "respectReducedMotion": true
+    }
+  },
+  "componentMappings": {
+    "button": {
+      "cssVars": {
+        "backgroundRest": "var(--ms-color-brand-background)",
+        "backgroundHover": "var(--ms-color-brand-hover)",
+        "backgroundPressed": "var(--ms-color-brand-pressed)",
+        "textColor": "var(--ms-color-text-onBrand)",
+        "borderRadius": "var(--ms-radius-medium)",
+        "focusColor": "var(--ms-focus-color)",
+        "focusWidth": "var(--ms-focus-width)"
+      },
+      "states": {
+        "rest": "var(--ms-button-bg-rest)",
+        "hover": "var(--ms-button-bg-hover)",
+        "active": "var(--ms-button-bg-pressed)",
+        "focus": "var(--ms-focus-color)",
+        "disabled": "var(--ms-foreground-disabled)",
+        "selected": "var(--ms-color-brand-selected)"
+      }
+    },
+    "input": {
+      "cssVars": {
+        "background": "var(--ms-surface-card)",
+        "border": "var(--ms-stroke-medium)",
+        "focusColor": "var(--ms-focus-color)",
+        "radius": "var(--ms-radius-small)",
+        "text": "var(--ms-foreground-default)",
+        "placeholder": "var(--ms-foreground-muted)"
+      },
+      "states": {
+        "rest": "var(--ms-surface-card)",
+        "hover": "var(--ms-surface-card)",
+        "active": "var(--ms-surface-card)",
+        "focus": "var(--ms-surface-card)",
+        "disabled": "var(--ms-surface-subtle)",
+        "selected": "var(--ms-surface-card)"
+      }
+    },
+    "card": {
+      "cssVars": {
+        "background": "var(--ms-surface-card)",
+        "border": "var(--ms-surface-border)",
+        "radius": "var(--ms-radius-large)",
+        "shadow": "0 1px 3px rgba(0,0,0,0.08)"
+      },
+      "states": {
+        "rest": "var(--ms-surface-card)",
+        "hover": "var(--ms-surface-card)",
+        "active": "var(--ms-surface-card)",
+        "focus": "var(--ms-surface-card)",
+        "disabled": "var(--ms-surface-subtle)",
+        "selected": "var(--ms-surface-elevated)"
+      }
+    },
+    "dialog": {
+      "cssVars": {
+        "background": "var(--ms-surface-overlay)",
+        "backdrop": "rgba(0, 0, 0, 0.45)",
+        "border": "var(--ms-surface-border)",
+        "radius": "var(--ms-radius-large)"
+      },
+      "states": {
+        "rest": "var(--ms-surface-overlay)",
+        "hover": "var(--ms-surface-overlay)",
+        "active": "var(--ms-surface-overlay)",
+        "focus": "var(--ms-surface-overlay)",
+        "disabled": "var(--ms-surface-overlay)",
+        "selected": "var(--ms-surface-overlay)"
+      }
+    }
+  }
+}

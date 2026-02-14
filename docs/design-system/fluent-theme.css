@@ -1,0 +1,220 @@
+:root,
+[data-ms-theme='light'] {
+  --ms-color-background-default: #fafafa;
+  --ms-color-background-subtle: #f3f4f7;
+  --ms-color-background-canvas: #ffffff;
+  --ms-color-foreground-default: #202020;
+  --ms-color-foreground-muted: #5f6368;
+  --ms-color-foreground-disabled: #8a9099;
+  --ms-color-surface-card: #ffffff;
+  --ms-color-surface-elevated: #ffffff;
+  --ms-color-surface-overlay: #ffffff;
+  --ms-color-surface-border: #d9dee7;
+  --ms-color-brand-background: #0078d4;
+  --ms-color-brand-hover: #006cbe;
+  --ms-color-brand-pressed: #005ba1;
+  --ms-color-text-onBrand: #ffffff;
+  --ms-color-brand-focus: #005a9e;
+  --ms-color-brand-selected: #deecf9;
+  --ms-color-status-success: #107c10;
+  --ms-color-status-warning: #ff8c00;
+  --ms-color-status-danger: #d13438;
+  --ms-color-status-info: #0063b1;
+  --ms-color-text-link: #005a9e;
+  --ms-color-text-link-hover: #004578;
+  --ms-spacing-4: 4px;
+  --ms-spacing-8: 8px;
+  --ms-spacing-12: 12px;
+  --ms-spacing-16: 16px;
+  --ms-spacing-24: 24px;
+  --ms-spacing-32: 32px;
+  --ms-spacing-48: 48px;
+  --ms-spacing-56: 56px;
+  --ms-font-family-base: "Segoe UI", "Noto Sans KR", Arial, sans-serif;
+  --ms-font-family-code: Consolas, "SFMono-Regular", Menlo, monospace;
+  --ms-font-size-caption: 12px;
+  --ms-font-size-body: 14px;
+  --ms-font-size-title: 20px;
+  --ms-font-size-subtitle: 16px;
+  --ms-font-size-display: 24px;
+  --ms-line-height-compact: 1.2;
+  --ms-line-height-comfortable: 1.4;
+  --ms-line-height-loose: 1.6;
+  --ms-font-weight-regular: 400;
+  --ms-font-weight-semibold: 600;
+  --ms-font-weight-bold: 700;
+  --ms-radius-small: 4px;
+  --ms-radius-medium: 6px;
+  --ms-radius-large: 10px;
+  --ms-radius-full: 9999px;
+  --ms-stroke-thin: 1px;
+  --ms-stroke-medium: 2px;
+  --ms-stroke-focus: 2px;
+  --ms-focus-color: #0055c8;
+  --ms-focus-width: 2px;
+  --ms-focus-offset: 2px;
+  --ms-motion-fast: 120ms;
+  --ms-motion-normal: 220ms;
+  --ms-motion-slow: 320ms;
+  --ms-motion-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ms-motion-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --ms-button-bg-rest: var(--ms-color-brand-background);
+  --ms-button-bg-hover: var(--ms-color-brand-hover);
+  --ms-button-bg-pressed: var(--ms-color-brand-pressed);
+  --ms-button-text: var(--ms-color-text-onBrand);
+  --ms-input-bg: var(--ms-color-surface-card);
+  --ms-input-border: var(--ms-color-surface-border);
+  --ms-input-text: var(--ms-color-foreground-default);
+  --ms-card-bg: var(--ms-color-surface-card);
+  --ms-dialog-bg: var(--ms-color-surface-overlay);
+  --ms-dialog-backdrop: rgba(0, 0, 0, 0.45);
+}
+
+[data-ms-theme='dark'] {
+  --ms-color-background-default: #1b1a19;
+  --ms-color-background-subtle: #252423;
+  --ms-color-background-canvas: #202020;
+  --ms-color-foreground-default: #f3f2f1;
+  --ms-color-foreground-muted: #c8c6c4;
+  --ms-color-foreground-disabled: #8a8886;
+  --ms-color-surface-card: #2f2f2f;
+  --ms-color-surface-elevated: #2f2f2f;
+  --ms-color-surface-overlay: #2f2f2f;
+  --ms-color-surface-border: #605e5c;
+  --ms-color-brand-background: #2f7bd8;
+  --ms-color-brand-hover: #4588d4;
+  --ms-color-brand-pressed: #5b95da;
+  --ms-color-text-onBrand: #f3f2f1;
+  --ms-color-brand-focus: #7baaf2;
+  --ms-color-brand-selected: #264f77;
+  --ms-color-status-success: #5ed66d;
+  --ms-color-status-warning: #ffca55;
+  --ms-color-status-danger: #ff5f56;
+  --ms-color-status-info: #62b1ff;
+  --ms-color-text-link: #8ab4f8;
+  --ms-color-text-link-hover: #a6c5fa;
+  --ms-dialog-backdrop: rgba(0, 0, 0, 0.65);
+}
+
+[data-ms-theme='highContrast'] {
+  --ms-color-background-default: Canvas;
+  --ms-color-background-subtle: Canvas;
+  --ms-color-background-canvas: Canvas;
+  --ms-color-foreground-default: CanvasText;
+  --ms-color-foreground-muted: CanvasText;
+  --ms-color-foreground-disabled: GrayText;
+  --ms-color-surface-card: Canvas;
+  --ms-color-surface-elevated: Canvas;
+  --ms-color-surface-overlay: Canvas;
+  --ms-color-surface-border: ButtonText;
+  --ms-color-brand-background: ButtonFace;
+  --ms-color-brand-hover: Highlight;
+  --ms-color-brand-pressed: Highlight;
+  --ms-color-text-onBrand: ButtonText;
+  --ms-color-brand-focus: Highlight;
+  --ms-color-brand-selected: Highlight;
+  --ms-color-status-success: Highlight;
+  --ms-color-status-warning: Highlight;
+  --ms-color-status-danger: Highlight;
+  --ms-color-status-info: Highlight;
+  --ms-color-text-link: LinkText;
+  --ms-color-text-link-hover: LinkText;
+  --ms-dialog-backdrop: rgba(0, 0, 0, 0.85);
+}
+
+.ms-fluent-root {
+  --ms-body-font: var(--ms-font-family-base);
+  --ms-heading-font: var(--ms-font-family-base);
+  color: var(--ms-color-foreground-default);
+  background: var(--ms-color-background-default);
+  font-family: var(--ms-body-font);
+}
+
+.ms-fluent-button {
+  appearance: none;
+  border: var(--ms-stroke-medium) solid var(--ms-color-surface-border);
+  border-radius: var(--ms-radius-medium);
+  background: var(--ms-button-bg-rest);
+  color: var(--ms-button-text);
+  padding: var(--ms-spacing-8) var(--ms-spacing-16);
+  min-height: var(--ms-spacing-48);
+  font-family: var(--ms-font-family-base);
+  font-size: var(--ms-font-size-body);
+  font-weight: var(--ms-font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--ms-motion-fast) var(--ms-motion-enter);
+}
+
+.ms-fluent-button:hover:not(:disabled) { background: var(--ms-button-bg-hover); }
+.ms-fluent-button:active:not(:disabled) { background: var(--ms-button-bg-pressed); }
+.ms-fluent-button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.ms-fluent-input {
+  appearance: none;
+  width: 100%;
+  border: var(--ms-stroke-medium) solid var(--ms-input-border);
+  border-radius: var(--ms-radius-small);
+  background: var(--ms-input-bg);
+  color: var(--ms-input-text);
+  min-height: var(--ms-spacing-48);
+  padding: var(--ms-spacing-8) var(--ms-spacing-12);
+  font-size: var(--ms-font-size-body);
+  transition: border-color var(--ms-motion-fast) var(--ms-motion-enter);
+}
+
+.ms-fluent-input:focus-visible {
+  outline: var(--ms-focus-width) var(--ms-focus-style, solid) var(--ms-focus-color);
+  outline-offset: var(--ms-focus-offset);
+}
+
+.ms-fluent-input:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.ms-fluent-card {
+  border: var(--ms-stroke-thin) solid var(--ms-color-surface-border);
+  border-radius: var(--ms-radius-large);
+  background: var(--ms-card-bg);
+  padding: var(--ms-spacing-16);
+}
+
+.ms-fluent-dialog {
+  border: var(--ms-stroke-medium) solid var(--ms-color-surface-border);
+  border-radius: var(--ms-radius-large);
+  background: var(--ms-dialog-bg);
+  color: var(--ms-color-foreground-default);
+}
+
+.ms-fluent-dialog-backdrop {
+  background: var(--ms-dialog-backdrop);
+  position: fixed;
+  inset: 0;
+}
+
+.ms-fluent-focus-visible:focus-visible {
+  outline: var(--ms-focus-width) var(--ms-focus-style, solid) var(--ms-focus-color);
+  outline-offset: var(--ms-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ms-fluent-root,
+  .ms-fluent-button,
+  .ms-fluent-input,
+  .ms-fluent-card,
+  .ms-fluent-dialog {
+    forced-color-adjust: auto;
+  }
+}
