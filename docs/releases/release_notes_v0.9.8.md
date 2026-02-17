@@ -96,4 +96,4 @@ In replayed sessions, tool calls containing namespaced names (for example `funct
 ### E. Post-release follow-up (manual)
 - [ ] Confirm GitHub Release page shows assets and generated notes.
 - [ ] Confirm extension manifest references are updated to new version/asset URLs and checksums before merging any dependent release PR.
-- [ ] Run manual checklist in `docs/qa_checklist.md` for user-visible flows.
+- [ ] Run manual checklist in `docs/quality/qa_checklist.md` for user-visible flows.

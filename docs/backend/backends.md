@@ -3,6 +3,10 @@
 This repository implements an ACP adapter around the Codex CLI (codex-rs).
 It also includes a backend driver boundary so we can add other CLI-first agents later without changing the ACP surface.
 
+Detailed implementation guidance:
+
+- `docs/backend/backend_development_guide.md`
+
 ## CLI Flag
 
 - `--backend=codex|claude-code|gemini` (default: `codex`)
@@ -39,7 +43,7 @@ This keeps the ACP request/response shapes stable while allowing internal backen
 
 Codex uses `CODEX_HOME`. For other backends, use a backend-specific home directory (for example `~/.acp/<backend>` or an env var like `<BACKEND>_HOME`) so sessions do not collide and behavior stays predictable.
 
-In addition, this project can write a backend-agnostic canonical log under `ACP_HOME` (default: `~/.acp`). This enables cross-backend continuity without forcing vendors to share one native session format. See `docs/session_store.md`.
+In addition, this project can write a backend-agnostic canonical log under `ACP_HOME` (default: `~/.acp`). This enables cross-backend continuity without forcing vendors to share one native session format. See `docs/backend/session_store.md`.
 
 ## Session Monitoring Defaults (codex backend)
 

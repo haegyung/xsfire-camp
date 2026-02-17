@@ -19,7 +19,7 @@ flattening them into “chat only”.
 - Compatibility with community VS Code ACP extensions that invoke agents as `<command> acp` or with
   `--acp` (no-ops).
 - Global canonical session store under `ACP_HOME` (default `~/.acp`) that records a structured
-  timeline (prompt summary, tool calls, plan, approvals). See `docs/session_store.md`.
+  timeline (prompt summary, tool calls, plan, approvals). See `docs/backend/session_store.md`.
 
 ## Next (Near Term)
 

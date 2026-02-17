@@ -20,7 +20,7 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 
 - ACP 표준 I/O(stdio)로 동작하는 Codex 에이전트
 - 세션 저장소 공유: ACP `session_id`를 Codex thread id와 동일하게 사용하고, 세션 소스를 CLI와 맞춰 동일한 세션 저장소(`CODEX_HOME`)를 사용
-- (옵션) 글로벌 세션 저장소: backend-native 로그는 분리한 채, `ACP_HOME`(기본 `~/.acp`)에 canonical 작업 로그(JSONL)를 추가로 남겨 “모델/클라이언트가 바뀌어도” 맥락을 이어가기 쉽게 함 (`docs/session_store.md`)
+- (옵션) 글로벌 세션 저장소: backend-native 로그는 분리한 채, `ACP_HOME`(기본 `~/.acp`)에 canonical 작업 로그(JSONL)를 추가로 남겨 “모델/클라이언트가 바뀌어도” 맥락을 이어가기 쉽게 함 (`docs/backend/session_store.md`)
 - Embedded context / @-mentions, 이미지 입력 지원(클라이언트가 제공할 때)
 - Tool calls(쉘 실행, apply_patch, 웹 검색, MCP tool call 등) 스트리밍 및 결과 업데이트
 - 승인(Approvals) 플로우: 실행/패치 등 위험 동작을 `RequestPermission`으로 노출하고 사용자 선택을 반영
@@ -52,7 +52,8 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 - 다음: Claude Code/Gemini CLI 같은 **CLI 기반 백엔드** 드라이버를 구현하고, 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존합니다.
 - 나중: canonical 로그 스키마/상관관계 ID/보안(레닥션) 정책을 강화해 “모델이 바뀌어도” 작업 맥락을 더 안정적으로 이어가게 합니다.
 
-자세한 계획: `docs/roadmap.md`, `docs/backends.md`, `docs/session_store.md`, `docs/policies.md`.
+자세한 계획: `docs/plans/roadmap.md`, `docs/backend/backends.md`, `docs/backend/session_store.md`, `docs/backend/policies.md`.
+문서 인덱스: `docs/README.md`.
 
 ### 이용 케이스
 
@@ -83,7 +84,7 @@ Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 - ACP 클라이언트(예: Zed) 또는 ACP를 실행할 수 있는 클라이언트
 - 인증: `OPENAI_API_KEY` 또는 `CODEX_API_KEY` 또는 ChatGPT subscription(환경에 따라)
 - 동일한 사용자 계정에서 `CODEX_HOME`을 공유하는 것을 권장
-- (옵션) 글로벌 canonical 로그: `ACP_HOME` (기본 `~/.acp`) 및 정책은 `docs/session_store.md`, `docs/policies.md` 참고
+- (옵션) 글로벌 canonical 로그: `ACP_HOME` (기본 `~/.acp`) 및 정책은 `docs/backend/session_store.md`, `docs/backend/policies.md` 참고
 
 ### 설치/실행 (바이너리)
 
@@ -182,9 +183,9 @@ npx @haegyung/xsfire-camp
 
 참고:
 
-- `CODEX_HOME` 구조/권한: `docs/codex_home_overview.md`
-- 이벤트 -> ACP 출력 매핑: `docs/event_handling.md`
-- 로컬 검증 가이드: `docs/verification_guidance.md`
+- `CODEX_HOME` 구조/권한: `docs/reference/codex_home_overview.md`
+- 이벤트 -> ACP 출력 매핑: `docs/reference/event_handling.md`
+- 로컬 검증 가이드: `docs/quality/verification_guidance.md`
 
 ## How to use (EN)
 

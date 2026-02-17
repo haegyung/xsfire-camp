@@ -23,7 +23,7 @@ CIDR–like manual verification steps:
    - `/monitor retro` 호출 시 회고형 상태 보고서(레인/리스크/학습/다음 작업) 텍스트가 출력되는지 확인할 수 있습니다.
 6. `Task Orchestration`을 `sequential`로 바꾼 뒤 task가 진행 중일 때 새 요청을 보내, 즉시 대기 안내 메시지가 나오는지 확인합니다.
 7. `logs/codex_chats/<agent>/<timestamp>.md`에 새 turn이 기록되는지 확인하며, 각 turn에서 `Plan`/`ToolCall`/`RequestPermission`이 나오는지 검토합니다.
-8. `docs/event_handling.md`에 정리한 매핑에 따라 각 `EventMsg`(PlanUpdate, ExecCommand*, McpToolCall*, RequestUserInput 등)가 ACP notification으로 나오는지 확인하고, KVS 로그(예: `tracing` 출력)를 참고하세요.
+8. `docs/reference/event_handling.md`에 정리한 매핑에 따라 각 `EventMsg`(PlanUpdate, ExecCommand*, McpToolCall*, RequestUserInput 등)가 ACP notification으로 나오는지 확인하고, KVS 로그(예: `tracing` 출력)를 참고하세요.
 9. 웹 인터페이스(Zed)를 사용하는 경우, slash 명령을 실행하면서 Agent Panel의 `Plan`, `Tool Calls`, `Terminal` 탭이 정상적으로 업데이트되는지 보세요.
 
 ### 실행 스크립트(체크리스트 리포트 생성)
@@ -48,6 +48,6 @@ scripts/manual_verification_setup_monitor.sh --skip-gates
 
 CI/QA 파이프라인에서는
 1. `cargo test`를 항상 실행하고
-2. `docs/event_handling.md`의 이벤트-출력 매핑이 누락되었는지 유지보수 체크리스트로 사용하세요.
+2. `docs/reference/event_handling.md`의 이벤트-출력 매핑이 누락되었는지 유지보수 체크리스트로 사용하세요.
 
 필요하면 위 내용을 스크립트로 자동화하거나, 오류 발생 시 log snippet을 붙여 PR 검토자에게 보여주는 것도 좋습니다.

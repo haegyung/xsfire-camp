@@ -34,13 +34,13 @@
 
 ###### A1 Write verification summary (completed)
 - depends_on: `none`
-- output: `docs/release_plan_v0.9.4.md` verification section
+- output: `docs/plans/release_plan_v0.9.4.md` verification section
 - done_check: `cargo test` and node test results listed
 - owner: `Codex`
 
 ###### A2 Add traceability refs (completed)
 - depends_on: `A1`
-- output: commit/tag references in `docs/release_plan_v0.9.4.md`
+- output: commit/tag references in `docs/plans/release_plan_v0.9.4.md`
 - done_check: commit `afc3190`, tags `v0.9.4`, `v0.9.5` explicitly listed
 - owner: `Codex`
 
@@ -110,4 +110,4 @@
 - branch: `main`
 - head: `afc3190` (pushed)
 - release tags: `v0.9.4` (`43bbe0e`), `v0.9.5` (`2cf1842`)
-- source references: `docs/roadmap.md`, `docs/release_plan_v0.9.4.md`, `src/codex_agent.rs`, `src/thread.rs`
+- source references: `docs/plans/roadmap.md`, `docs/plans/release_plan_v0.9.4.md`, `src/codex_agent.rs`, `src/thread.rs`

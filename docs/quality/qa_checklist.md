@@ -3,17 +3,17 @@
 Use this checklist before tagging/publishing the extension release.
 
 1. **Documentation**
-   - [x] `docs/install_shared_settings.md` describes shared `CODEX_HOME` usage.
-   - [x] `docs/event_handling.md` maps CLI events to ACP notifications.
-   - [x] `docs/verification_guidance.md` outlines test steps.
-   - [x] `docs/codex_home_overview.md` lists `threads/`, `credentials/`, etc.
+   - [x] `docs/zed/install_shared_settings.md` describes shared `CODEX_HOME` usage.
+   - [x] `docs/reference/event_handling.md` maps CLI events to ACP notifications.
+   - [x] `docs/quality/verification_guidance.md` outlines test steps.
+   - [x] `docs/reference/codex_home_overview.md` lists `threads/`, `credentials/`, etc.
 2. **Code/Tests**
    - [x] `cargo test` (unit tests and event coverage) passes locally.
    - [x] `TaskState` delegates to `PromptState` to reuse event handling.
 3. **Zed-specific**
    - [x] `extension.toml` references live `vX.Y.Z` binaries for darwin/linux/windows targets with `sha256`.
-   - [x] `docs/extensions_toml_sample.md` updated to the latest extension entry format.
-   - [x] PR body template updated in `docs/zed_extension_pr_template.md`.
+   - [x] `docs/zed/extensions_toml_sample.md` updated to the latest extension entry format.
+   - [x] PR body template updated in `docs/zed/zed_extension_pr_template.md`.
 4. **Release Artifacts**
    - [x] Cargo/npm versions are consistent (`Cargo.toml` = `X.Y.Z`, `npm/package.json` = `X.Y.Z`).
    - [x] `vX.Y.Z` tag exists.
@@ -31,7 +31,7 @@ Use this checklist before tagging/publishing the extension release.
 Mark each step when complete and keep the checklist with the release notes for traceability.
 
 ### Design System (MS Fluent) Additions (Optional, for UI frontend)
-- [ ] `docs/ms_design_checklist_fluent.md` reviewed and approved.
+- [ ] `docs/design-system/ms_design_checklist_fluent.md` reviewed and approved.
 - [ ] `docs/design-system/MS_FLUENT_TOKEN_SCHEMA.md` is the source of truth for token keys.
 - [ ] `docs/design-system/fluent-tokens.json` values are synced with runtime tokens.
 - [ ] `docs/design-system/fluent-theme.css` is imported in UI entrypoint and rendered root uses `data-ms-theme`.

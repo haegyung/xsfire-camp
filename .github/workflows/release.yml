@@ -136,7 +136,7 @@ jobs:
       - name: Code sign macOS binary
         if: startsWith(matrix.os, 'macos') && env.MACOS_CERTIFICATE != ''
         run: |
-          ./script/sign-mac target/${{ matrix.target }}/release/xsfire-camp
+          ./scripts/sign-mac target/${{ matrix.target }}/release/xsfire-camp
 
       - name: Code sign Windows binary
         if: startsWith(matrix.os, 'windows') && env.AZURE_TENANT_ID != ''
@@ -145,7 +145,7 @@ jobs:
           TIMESTAMP_DIGEST: SHA256
           TIMESTAMP_SERVER: http://timestamp.acs.microsoft.com
         run: |
-          .\script\sign-windows.ps1 target\${{ matrix.target }}\release\xsfire-camp.exe
+          .\scripts\sign-windows.ps1 target\${{ matrix.target }}\release\xsfire-camp.exe
 
       - name: Create archive
         id: create_archive

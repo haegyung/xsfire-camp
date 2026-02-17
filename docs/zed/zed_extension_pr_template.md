@@ -14,7 +14,7 @@ Use this template when submitting the extension update to `zed-industries/extens
 ### Testing
 - `cargo test`
 - `xsfire-camp` run with `/review`, `/compact`, `/undo` (manual)
-- Verified Plan/ToolCall/RequestPermission logging via `docs/event_handling.md`
+- Verified Plan/ToolCall/RequestPermission logging via `docs/reference/event_handling.md`
 
 ### Files added/updated
 - `extensions/xsfire-camp/manifest.toml`

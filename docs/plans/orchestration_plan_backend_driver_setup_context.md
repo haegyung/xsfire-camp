@@ -105,7 +105,7 @@ Prerequisites: A4.1.a.2
 
 A5.1.a.2: Update docs to reflect driver boundary and wizard UX (depends_on: W5.1.a)
 Definition: Keep repo SoT aligned with shipped behavior.
-Output: Updated `docs/backends.md` and/or `README.md` notes.
+Output: Updated `docs/backend/backends.md` and/or `README.md` notes.
 Done: Docs mention driver interface and `/setup` Plan wizard behavior.
 Prerequisites: A5.1.a.1
 
@@ -122,7 +122,7 @@ Prerequisites: A5.1.a.1
 ## Context Snapshot
 - Project: `xsfire-camp`
 - Branch: `main`
-- Active files: `src/lib.rs`, `src/main.rs`, `src/codex_agent.rs`, `src/thread.rs`, `docs/orchestration_plan_backend_driver_setup_context.md`
+- Active files: `src/lib.rs`, `src/main.rs`, `src/codex_agent.rs`, `src/thread.rs`, `docs/plans/orchestration_plan_backend_driver_setup_context.md`
 - Mode: local dev, tests-first, no external API changes
 - State: baseline tests currently pass; backend flag exists but only codex supported
 

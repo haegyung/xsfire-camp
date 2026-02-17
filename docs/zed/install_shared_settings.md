@@ -31,5 +31,5 @@ Zed 등의 ACP 클라이언트에 에이전트를 등록할 때도 `command` 필
 | 인증 | CLI에서 사용하던 `credentials/`가 그대로 사용되므로 `OPENAI_API_KEY`, `CODEX_API_KEY` 등도 동일하게 가져갑니다. |
 
 ## 참고 자료
-- `docs/event_handling.md`: ACL 이벤트 ↔ ACP 알림 흐름을 확인할 때 참고.
+- `docs/reference/event_handling.md`: ACL 이벤트 ↔ ACP 알림 흐름을 확인할 때 참고.
 - `npm/README.md`: Zed 외부 에이전트 등록 가이드 요약.
