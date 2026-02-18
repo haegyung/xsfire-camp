@@ -27,6 +27,18 @@ Use this checklist before tagging/publishing the extension release.
    - [ ] Inspect `logs/codex_chats/...` for `Plan`, `ToolCall`, and `RequestPermission` entries.
    - [ ] (Optional) Verify canonical log under `ACP_HOME` (default `~/.acp`) is created and appends `canonical.jsonl`.
    - [ ] Confirm Zed agent panel (if available) shows plan/tool call updates as expected.
+  6. **ACP compatibility (based on `docs/reference/acp_standard_spec.md`)**
+   - [ ] Run `scripts/acp_compat_smoke.sh --strict` and archive the generated report under `logs/smoke/`.
+   - [ ] If strict mode fails, attach the corresponding failure log from `logs/smoke/logs/*.log` to the release issue/PR.
+   - [ ] `initialize` returns `protocolVersion=v1` and advertises capability contract (`embeddedContext=true`, `image=true`, `audio=false`, `mcp.http=true`, `mcp.sse=false`, `session.list=true`).
+   - [ ] `codex` backend passes core ACP flow: `authenticate` -> `session/new|load` -> repeated `session/prompt` -> `session/cancel` and returns valid JSON-RPC 2.0 envelopes.
+   - [ ] `claude-code`/`gemini` backends keep declared behavior: `session/load`, `session/set_mode`, `session/set_model`, `session/set_config_option` return `invalid_params` (or documented no-op/success for `session/cancel`).
+   - [ ] `session/update` stream includes expected update types (`AgentMessageChunk`, `AgentThoughtChunk`, `ToolCall`, `ToolCallUpdate`, `Plan`, `AvailableCommandsUpdate`, `CurrentModeUpdate`) without schema violations.
+   - [ ] `ToolCall`/`Plan` status transitions stay in allowed enums (`pending`, `in_progress`, `completed`, `failed`) and do not regress state order during one turn.
+   - [ ] `session/request_permission` round-trip is recorded with request/response pair in canonical logs when `ACP_HOME` logging is enabled.
+   - [ ] `fs/*` capability path enforces session-root boundary checks and falls back to local FS access only when ACP FS capability is not advertised.
+   - [ ] `terminal/*` integration works only when client capability is present, and tool execution progress is surfaced via ACP updates.
+   - [ ] `session/list`, `session/set_model`, `session/set_config_option` (unstable) are smoke-tested against current schema versions and tracked as release risk if behavior changes.
 
 Mark each step when complete and keep the checklist with the release notes for traceability.
 

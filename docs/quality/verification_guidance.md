@@ -1,53 +1,227 @@
-# 검증/테스트 안내
+# ACP 검증 실행 가이드
 
-다음 절차로 ACP가 CLI와 동일하게 동작하는지 확인할 수 있습니다.
+이 문서는 ACP 호환성 검증을 `실행 명령`과 `기대 결과` 중심으로 정리한 런북입니다.
+정본 스펙/매핑 문서는 아래 두 파일을 기준으로 삼습니다.
 
-## 1. 자동화된 테스트
+- `docs/reference/acp_standard_spec.md`
+- `docs/reference/event_handling.md`
+
+## 0. 사전 준비
+
+### Step 0-1. 작업 디렉토리 확인
+
+명령:
+
+```bash
+pwd
+```
+
+기대 결과:
+
+- 출력 경로가 저장소 루트(예: `.../xsfire`)여야 합니다.
+
+### Step 0-2. Rust/Node 실행 가능 확인
+
+명령:
+
+```bash
+cargo --version
+node --version
+```
+
+기대 결과:
+
+- 두 명령 모두 종료 코드 `0`.
+- 버전 문자열이 출력되고 `command not found`가 없어야 합니다.
+
+## 1. 자동 기본 게이트
+
+### Step 1-1. 포맷 검증
+
+명령:
+
+```bash
+cargo fmt --check
+```
+
+기대 결과:
+
+- 종료 코드 `0`.
+- 포맷 오류가 없고 diff 출력이 없어야 합니다.
+
+### Step 1-2. 단위 테스트
+
+명령:
 
 ```bash
 cargo test
 ```
 
-현재 `thread.rs`/`prompt_args.rs`에 있는 단위 테스트가 실행되며, Task/Prompt 흐름을 포함합니다. 성공 메시지가 나오면 기본 Promise loop가 깨지지 않고 `PromptState`가 정상 작동함을 의미합니다.
+기대 결과:
 
-## 2. 수동 검증 시나리오
+- 종료 코드 `0`.
+- `thread`/`prompt_args`/`session_store` 관련 테스트가 모두 통과합니다.
 
-CIDR–like manual verification steps:
-1. `CODEX_HOME`이 CLI와 동일한지 확인하고, 같은 `threads/`/`rollouts/`/`credentials/` 디렉토리 경로를 사용하세요.
-2. ACP(예: `xsfire-camp`)를 실행하고 `/setup`를 먼저 실행해 setup wizard plan을 띄웁니다.
-3. `/status` -> `/monitor` -> `/vector` 순서로 실행하고, Plan의 `Verify: run /status, /monitor, and /vector`가 `pending -> in_progress -> completed`로 갱신되는지 확인합니다.
-4. Config Options에서 `Model`, `Reasoning Effort`, `Approval Preset`, `Task Orchestration`, `Task Monitoring`(`on/auto/off`), `Progress Vector Checks` 중 하나를 변경하고, Plan progress가 즉시 반영되는지 확인합니다.
-5. `/monitor` 출력에 다음이 보이는지 확인합니다.
-   - `Task monitoring: orchestration=..., monitor=..., vector_checks=...`
-   - 활성 task가 있으면 `Task queue: N active` 및 항목 목록
-   - `/monitor retro` 호출 시 회고형 상태 보고서(레인/리스크/학습/다음 작업) 텍스트가 출력되는지 확인할 수 있습니다.
-6. `Task Orchestration`을 `sequential`로 바꾼 뒤 task가 진행 중일 때 새 요청을 보내, 즉시 대기 안내 메시지가 나오는지 확인합니다.
-7. `logs/codex_chats/<agent>/<timestamp>.md`에 새 turn이 기록되는지 확인하며, 각 turn에서 `Plan`/`ToolCall`/`RequestPermission`이 나오는지 검토합니다.
-8. `docs/reference/event_handling.md`에 정리한 매핑에 따라 각 `EventMsg`(PlanUpdate, ExecCommand*, McpToolCall*, RequestUserInput 등)가 ACP notification으로 나오는지 확인하고, KVS 로그(예: `tracing` 출력)를 참고하세요.
-9. 웹 인터페이스(Zed)를 사용하는 경우, slash 명령을 실행하면서 Agent Panel의 `Plan`, `Tool Calls`, `Terminal` 탭이 정상적으로 업데이트되는지 보세요.
+### Step 1-3. npm 플랫폼 감지 테스트
 
-### 실행 스크립트(체크리스트 리포트 생성)
+명령:
+
+```bash
+node npm/testing/test-platform-detection.js
+```
+
+기대 결과:
+
+- 종료 코드 `0`.
+- 플랫폼 분기 검증이 실패 없이 완료됩니다.
+
+## 2. ACP 호환 Smoke(초안) 자동 점검
+
+### Step 2-1. 스모크 스크립트 실행
+
+명령:
+
+```bash
+scripts/acp_compat_smoke.sh
+```
+
+기대 결과:
+
+- 종료 코드 `0`.
+- `src/acp_agent.rs`의 핵심 메서드/초기 capability 선언 정적 점검이 `pass`.
+- ACP 관련 타깃 테스트가 `pass`.
+- 리포트 파일이 `logs/smoke/acp_compat_smoke_<timestamp>.md`에 생성됩니다.
+
+### Step 2-2. 테스트 생략 모드(문서/코드 정적 체크만)
+
+명령:
+
+```bash
+scripts/acp_compat_smoke.sh --skip-tests
+```
+
+기대 결과:
+
+- 종료 코드 `0`.
+- 정적 체크 결과만 포함한 리포트가 생성됩니다.
+
+### Step 2-3. 엄격 모드(필수 ACP 회귀 테스트 고정 실행)
+
+명령:
+
+```bash
+scripts/acp_compat_smoke.sh --strict
+```
+
+기대 결과:
+
+- 종료 코드 `0`.
+- 리포트에 `Strict mode: true`가 표시됩니다.
+- 아래 필수 테스트가 모두 `pass`로 표시됩니다.
+  - `thread::tests::test_setup_plan_verification_progress_updates`
+  - `thread::tests::test_setup_plan_visible_in_monitor_output`
+  - `thread::tests::test_monitoring_auto_mode_clears_completed_prompt_tasks`
+  - `thread::tests::test_canonical_log_correlation_path`
+  - `session_store::tests::writes_canonical_log_and_redacts_secrets`
+
+### Step 2-4. 최신 스모크 리포트 확인
+
+명령:
+
+```bash
+ls -1t logs/smoke/acp_compat_smoke_*.md | head -n 1
+```
+
+기대 결과:
+
+- 최신 리포트 경로가 1개 출력됩니다.
+
+## 3. Setup/Monitor 수동 시나리오
+
+### Step 3-1. 수동 체크리스트 리포트 템플릿 생성
+
+명령:
 
 ```bash
 scripts/manual_verification_setup_monitor.sh
 ```
 
-- 실행 결과로 `logs/manual_verification/setup_monitor_<timestamp>.md` 리포트가 생성됩니다.
-- 자동 게이트를 건너뛰고 체크리스트만 생성하려면:
+기대 결과:
 
-```bash
-scripts/manual_verification_setup_monitor.sh --skip-gates
+- 종료 코드 `0`.
+- `logs/manual_verification/setup_monitor_<timestamp>.md` 파일이 생성됩니다.
+
+### Step 3-2. ACP 클라이언트에서 명령 순서 검증
+
+명령(ACP 클라이언트 slash command):
+
+```text
+/setup
+/status
+/monitor
+/vector
 ```
 
-## 3. 로그/도구 호출 확인
+기대 결과:
 
-- `logs/` 디렉토리의 `codex_chats` 파일을 열어 `Plan` 업데이트나 `ToolCall` 생성 시각을 확인할 수 있습니다.
-- `session_notification`을 디버깅하려면 `RUST_LOG=debug`를 활성화하고, `xsfire-camp`(또는 `cargo run --release`)을 실행해주세요.
+- setup wizard Plan이 활성화됩니다.
+- Plan 항목 `Verify: run /status, /monitor, and /vector`가 `pending -> in_progress -> completed`로 이동합니다.
+- `/monitor` 출력에 `Task monitoring: orchestration=..., monitor=..., vector_checks=...`가 포함됩니다.
 
-## 4. 반복 검증
+### Step 3-3. 모니터 회고 모드 검증
 
-CI/QA 파이프라인에서는
-1. `cargo test`를 항상 실행하고
-2. `docs/reference/event_handling.md`의 이벤트-출력 매핑이 누락되었는지 유지보수 체크리스트로 사용하세요.
+명령(ACP 클라이언트 slash command):
 
-필요하면 위 내용을 스크립트로 자동화하거나, 오류 발생 시 log snippet을 붙여 PR 검토자에게 보여주는 것도 좋습니다.
+```text
+/monitor retro
+```
+
+기대 결과:
+
+- 레인 기반 회고형 상태 보고서(진행률/리스크/다음 작업)가 출력됩니다.
+
+### Step 3-4. sequential 오케스트레이션 동작 검증
+
+명령(ACP 클라이언트 설정 + 프롬프트 입력):
+
+```text
+Task Orchestration = sequential
+```
+
+기대 결과:
+
+- 활성 task가 있는 상태에서 새 요청을 보내면 병렬 제출 대신 대기 안내 메시지가 나옵니다.
+
+## 4. 로그/이벤트 매핑 확인
+
+### Step 4-1. 대화 로그에 핵심 이벤트 기록 여부 확인
+
+명령:
+
+```bash
+rg -n "Plan|ToolCall|RequestPermission" logs/codex_chats -g "*.md"
+```
+
+기대 결과:
+
+- 최근 대화 로그에서 Plan/ToolCall/Permission 관련 라인이 검색됩니다.
+
+### Step 4-2. 이벤트 매핑 문서와 구현 추적 대조
+
+명령:
+
+```bash
+rg -n "PlanUpdate|ExecCommand|McpToolCall|RequestUserInput" docs/reference/event_handling.md
+```
+
+기대 결과:
+
+- 표에 핵심 이벤트-ACP 출력 매핑이 존재해야 합니다.
+
+## 5. 실패 시 처리 기준
+
+- `cargo fmt --check` 실패: 포맷 정리 후 재실행.
+- `cargo test` 실패: 실패 테스트 이름과 로그를 첨부해 원인 분석.
+- smoke 스크립트 실패: 리포트(`logs/smoke/...`)에서 fail 항목 확인 후 문서/구현 싱크 재검증.
+- strict 모드 테스트 실패: 로그(`logs/smoke/logs/*.log`)의 실패 케이스를 이슈에 첨부.
+- 수동 시나리오 실패: `docs/reference/acp_standard_spec.md`와 실제 동작 차이를 이슈로 기록하고 릴리즈 노트에 반영.
