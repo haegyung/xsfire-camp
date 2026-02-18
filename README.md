@@ -11,6 +11,8 @@ session source as CLI sessions while preserving ACP behavior.
 
 Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
 
+Language: [한국어](#총정리-kr) | [English](#overview-en)
+
 ## 총정리 (KR)
 
 `xsfire-camp`는 **Codex CLI(codex-rs)** 를 **ACP(Agent Client Protocol)** 에이전트로 감싸, Zed/VS Code(ACP 확장) 같은 ACP 클라이언트에서 Codex를 “대화”가 아니라 **작업 실행이 포함된 세션**으로 운용하게 해줍니다.
@@ -188,11 +190,39 @@ npx @haegyung/xsfire-camp
 - 이벤트 -> ACP 출력 매핑: `docs/reference/event_handling.md`
 - 로컬 검증 가이드: `docs/quality/verification_guidance.md`
 
-## How to use (EN)
+## Overview (EN)
 
-This repository is documented primarily in Korean above. This section is a short English quick start.
+`xsfire-camp` wraps **Codex CLI (codex-rs)** as an **ACP (Agent Client Protocol)** agent so ACP clients (for example, Zed or ACP-enabled VS Code extensions) can run Codex as an execution-first working session, not just a chat window.
 
-### Quick start (binary)
+It is designed so ACP sessions and CLI sessions can share the same `CODEX_HOME` source of truth, making handoff between IDE and terminal smoother.
+
+### What It Provides
+
+- ACP stdio agent wrapper for Codex
+- Session continuity:
+  ACP `session_id` is aligned with Codex thread identity and shared session metadata in `CODEX_HOME`
+- Optional canonical global logging via `ACP_HOME` (default `~/.acp`) while preserving backend-native logs
+- Embedded context / mentions and image input support (when client supports it)
+- Tool-call streaming and result updates (shell, `apply_patch`, web search, MCP tools)
+- Approval flow surfaced through ACP `RequestPermission`
+- Plan/TODO/terminal progression updates via ACP `SessionUpdate`
+- Slash-command parity focus:
+  `/setup`, `/review`, `/compact`, `/undo`, `/init`, `/sessions`, `/load`, `/mcp`, `/skills`, `/monitor`, `/vector`, `/experimental`
+- MCP server merge:
+  client-provided MCP endpoints are merged into codex-rs configuration
+
+### Why It Is Useful
+
+- Client independence:
+  keep one stable agent workflow across ACP clients
+- Session continuity:
+  continue work between IDE and CLI with shared `CODEX_HOME`
+- Better traceability:
+  actions (tool calls/plans/terminal outputs) remain structured and reviewable
+- Safer automation:
+  approval checkpoints guard risky execution and patch application
+
+### Quick Start (Binary)
 
 Build:
 
@@ -206,7 +236,20 @@ Run (ACP agent over stdio):
 OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 ```
 
-### Quick start (npm)
+Backend selection (default: `codex`):
+
+```
+target/release/xsfire-camp --backend=codex
+target/release/xsfire-camp --backend=claude-code
+target/release/xsfire-camp --backend=gemini
+```
+
+Notes:
+
+- `claude-code` / `gemini` are minimal backend implementations at this stage.
+- Those CLIs must be installed and authenticated separately.
+
+### Quick Start (npm)
 
 Run:
 
@@ -222,11 +265,13 @@ npm i -g @haegyung/xsfire-camp
 
 ### Clients
 
-- Zed: register this binary as a custom ACP agent (see `사용 방법 (KR)` above for a complete `settings.json` example).
-- VS Code: requires a community ACP client extension. Some extensions run agents as `<command> acp`; this binary accepts `acp`/`--acp` as no-ops for compatibility.
+- Zed:
+  register this binary as a custom ACP agent (see Korean section for full `settings.json` example).
+- VS Code:
+  requires a community ACP client extension. Some extensions run agents as `<command> acp`; this binary accepts `acp`/`--acp` as no-ops for compatibility.
 - Other ACP clients: see [ACP compatible clients](https://agentclientprotocol.com/overview/clients).
 
-### Automation
+### Automation / Release
 
 ```
 scripts/build_and_install.sh
@@ -240,9 +285,16 @@ cargo test
 node npm/testing/test-platform-detection.js
 ```
 
+### Documentation
+
+- Documentation index: `docs/README.md`
+- ACP mapping reference: `docs/reference/acp_standard_spec.md`
+- Event mapping: `docs/reference/event_handling.md`
+- Verification guide: `docs/quality/verification_guidance.md`
+
 ### Releases
 
-If you need a prebuilt binary, see:
+Prebuilt binaries and release assets:
 [haegyung/xsfire-camp releases](https://github.com/haegyung/xsfire-camp/releases)
 
 ## License
