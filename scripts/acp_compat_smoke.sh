@@ -5,24 +5,31 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_DIR="$ROOT_DIR/logs/smoke"
 TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 REPORT_PATH="$REPORT_DIR/acp_compat_smoke_${TIMESTAMP}.md"
+LOG_DIR="$REPORT_DIR/logs"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/acp_compat_smoke.sh [--skip-tests]
+Usage: scripts/acp_compat_smoke.sh [--skip-tests] [--strict]
 
 Runs ACP compatibility smoke checks and writes a markdown report under logs/smoke/.
 
 Options:
   --skip-tests   Run static checks only (skip cargo test commands)
+  --strict       Enforce fixed critical ACP test set and record failure logs
   -h, --help     Show this help message
 EOF
 }
 
 SKIP_TESTS="false"
+STRICT_MODE="false"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-tests)
       SKIP_TESTS="true"
+      shift
+      ;;
+    --strict)
+      STRICT_MODE="true"
       shift
       ;;
     -h|--help)
@@ -37,7 +44,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-mkdir -p "$REPORT_DIR"
+mkdir -p "$REPORT_DIR" "$LOG_DIR"
 
 STATIC_FAILURES=0
 TEST_FAILURES=0
@@ -74,11 +81,14 @@ run_rg_absent() {
 run_test_command() {
   local label="$1"
   local command="$2"
-  if (cd "$ROOT_DIR" && bash -lc "$command"); then
+  local log_file="$3"
+  if (cd "$ROOT_DIR" && bash -lc "$command" >"$log_file" 2>&1); then
     TEST_LINES+=("- ${label}: pass")
+    rm -f "$log_file"
   else
     TEST_LINES+=("- ${label}: fail")
     DETAIL_LINES+=("${label}: command failed -> ${command}")
+    DETAIL_LINES+=("${label}: log -> ${log_file}")
     TEST_FAILURES=1
   fi
 }
@@ -140,11 +150,37 @@ run_rg_present "gemini set_session_config_option unsupported contract" \
 if [[ "$SKIP_TESTS" == "true" ]]; then
   TEST_LINES+=("- cargo tests: skipped (--skip-tests)")
 else
-  run_test_command "cargo test -q thread::tests::" \
-    "cargo test -q thread::tests::"
-  run_test_command \
-    "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets" \
-    "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets"
+  if [[ "$STRICT_MODE" == "true" ]]; then
+    run_test_command \
+      "cargo test -q thread::tests::test_setup_plan_verification_progress_updates" \
+      "cargo test -q thread::tests::test_setup_plan_verification_progress_updates" \
+      "$LOG_DIR/acp_smoke_setup_plan_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q thread::tests::test_setup_plan_visible_in_monitor_output" \
+      "cargo test -q thread::tests::test_setup_plan_visible_in_monitor_output" \
+      "$LOG_DIR/acp_smoke_setup_monitor_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q thread::tests::test_monitoring_auto_mode_clears_completed_prompt_tasks" \
+      "cargo test -q thread::tests::test_monitoring_auto_mode_clears_completed_prompt_tasks" \
+      "$LOG_DIR/acp_smoke_task_cleanup_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q thread::tests::test_canonical_log_correlation_path" \
+      "cargo test -q thread::tests::test_canonical_log_correlation_path" \
+      "$LOG_DIR/acp_smoke_canonical_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets" \
+      "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets" \
+      "$LOG_DIR/acp_smoke_session_store_${TIMESTAMP}.log"
+  else
+    run_test_command \
+      "cargo test -q thread::tests::" \
+      "cargo test -q thread::tests::" \
+      "$LOG_DIR/acp_smoke_thread_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets" \
+      "cargo test -q session_store::tests::writes_canonical_log_and_redacts_secrets" \
+      "$LOG_DIR/acp_smoke_session_store_${TIMESTAMP}.log"
+  fi
 fi
 
 if [[ "$SKIP_TESTS" == "true" ]]; then
@@ -168,6 +204,7 @@ fi
   echo "- Repository: $ROOT_DIR"
   echo "- Script: scripts/acp_compat_smoke.sh"
   echo "- Skip tests: $SKIP_TESTS"
+  echo "- Strict mode: $STRICT_MODE"
   echo
   echo "## Static checks"
   for line in "${STATIC_LINES[@]}"; do
