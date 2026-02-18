@@ -1005,6 +1005,13 @@ impl PromptState {
         self.response_tx.as_ref().is_none_or(|tx| !tx.is_closed())
     }
 
+    fn finish_with_result(&mut self, result: Result<StopReason, Error>) {
+        if let Some(response_tx) = self.response_tx.take() {
+            drop(response_tx.send(result));
+        }
+        self.completed = true;
+    }
+
     #[expect(clippy::too_many_lines)]
     async fn handle_event(&mut self, client: &SessionClient, event: EventMsg) {
         self.event_count += 1;
@@ -1106,8 +1113,8 @@ impl PromptState {
             }
             EventMsg::ExecApprovalRequest(event) => {
                 info!("Command execution started: call_id={}, command={:?}", event.call_id, event.command);
-                if let Err(err) = self.exec_approval(client, event).await && let Some(response_tx) = self.response_tx.take() {
-                    drop(response_tx.send(Err(err)));
+                if let Err(err) = self.exec_approval(client, event).await {
+                    self.finish_with_result(Err(err));
                 }
             }
             EventMsg::ExecCommandBegin(event) => {
@@ -1144,8 +1151,8 @@ impl PromptState {
             }
             EventMsg::ApplyPatchApprovalRequest(event) => {
                 info!("Apply patch approval request: call_id={}, reason={:?}", event.call_id, event.reason);
-                if let Err(err) = self.patch_approval(client, event).await && let Some(response_tx) = self.response_tx.take() {
-                    drop(response_tx.send(Err(err)));
+                if let Err(err) = self.patch_approval(client, event).await {
+                    self.finish_with_result(Err(err));
                 }
             }
             EventMsg::PatchApplyBegin(event) => {
@@ -1163,11 +1170,7 @@ impl PromptState {
                 info!(
                     "Task completed successfully after {} events. Last agent message: {last_agent_message:?}", self.event_count
                 );
-                if let Some(response_tx) = self.response_tx.take() {
-                    response_tx.send(Ok(StopReason::EndTurn)).ok();
-                } else {
-                    self.completed = true;
-                }
+                self.finish_with_result(Ok(StopReason::EndTurn));
             }
             EventMsg::UndoStarted(event) => {
                 client
@@ -1191,27 +1194,18 @@ impl PromptState {
             }
             EventMsg::Error(ErrorEvent { message, codex_error_info }) => {
                 error!("Unhandled error during turn: {message} {codex_error_info:?}");
-                if let Some(response_tx) = self.response_tx.take() {
-                    response_tx.send(Err(Error::internal_error().data(json!({ "message": message, "codex_error_info": codex_error_info })))).ok();
-                } else {
-                    self.completed = true;
-                }
+                self.finish_with_result(Err(
+                    Error::internal_error()
+                        .data(json!({ "message": message, "codex_error_info": codex_error_info })),
+                ));
             }
             EventMsg::TurnAborted(TurnAbortedEvent { reason }) => {
                 info!("Turn aborted: {reason:?}");
-                if let Some(response_tx) = self.response_tx.take() {
-                    response_tx.send(Ok(StopReason::Cancelled)).ok();
-                } else {
-                    self.completed = true;
-                }
+                self.finish_with_result(Ok(StopReason::Cancelled));
             }
             EventMsg::ShutdownComplete => {
                 info!("Agent shutting down");
-                if let Some(response_tx) = self.response_tx.take() {
-                    response_tx.send(Ok(StopReason::Cancelled)).ok();
-                } else {
-                    self.completed = true;
-                }
+                self.finish_with_result(Ok(StopReason::Cancelled));
             }
             EventMsg::ViewImageToolCall(ViewImageToolCallEvent { call_id, path }) => {
                 info!("ViewImageToolCallEvent received");
@@ -1232,8 +1226,8 @@ impl PromptState {
             }
             EventMsg::ExitedReviewMode(event) => {
                 info!("Review end: output={event:?}");
-                if let Err(err) = self.review_mode_exit(client, event).await && let Some(response_tx) = self.response_tx.take() {
-                    drop(response_tx.send(Err(err)));
+                if let Err(err) = self.review_mode_exit(client, event).await {
+                    self.finish_with_result(Err(err));
                 }
             }
             EventMsg::Warning(WarningEvent { message }) => {
@@ -1253,8 +1247,8 @@ impl PromptState {
             }
             EventMsg::ElicitationRequest(event) => {
                 info!("Elicitation request: server={}, id={:?}, message={}", event.server_name, event.id, event.message);
-                if let Err(err) = self.mcp_elicitation(client, event).await && let Some(response_tx) = self.response_tx.take() {
-                    drop(response_tx.send(Err(err)));
+                if let Err(err) = self.mcp_elicitation(client, event).await {
+                    self.finish_with_result(Err(err));
                 }
             }
 
@@ -2906,12 +2900,11 @@ impl<A: Auth> ThreadActor<A> {
         if !self.setup_wizard_active {
             return;
         }
-        self.client
-            .update_plan(
-                self.setup_wizard_plan_items(),
-                explanation.map(ToOwned::to_owned),
-            )
-            .await;
+        let plan = self.setup_wizard_plan_items();
+        let explanation = explanation.map(ToOwned::to_owned);
+        self.flow_vector
+            .record_plan_update(explanation.clone(), plan.as_slice());
+        self.client.update_plan(plan, explanation).await;
     }
 
     async fn handle_set_config_option(
@@ -3813,9 +3806,7 @@ impl<A: Auth> ThreadActor<A> {
                 "setup" => {
                     self.setup_wizard_active = true;
                     self.maybe_emit_config_options_update().await;
-                    self.client
-                        .update_plan(self.setup_wizard_plan_items(), None)
-                        .await;
+                    self.maybe_emit_setup_wizard_plan_update(None).await;
                     self.client
                         .send_agent_text(self.render_setup_wizard_message())
                         .await;
@@ -6124,6 +6115,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_setup_plan_visible_in_monitor_output() -> anyhow::Result<()> {
+        let (session_id, client, _, message_tx, local_set) = setup(vec![]).await?;
+
+        async fn send_prompt(
+            message_tx: &UnboundedSender<ThreadMessage>,
+            session_id: &SessionId,
+            prompt: &str,
+        ) -> anyhow::Result<StopReason> {
+            let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+            message_tx.send(ThreadMessage::Prompt {
+                request: PromptRequest::new(session_id.clone(), vec![prompt.into()]),
+                response_tx: prompt_response_tx,
+            })?;
+            Ok(prompt_response_rx.await??.await??)
+        }
+
+        tokio::try_join!(
+            async {
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/setup").await?,
+                    StopReason::EndTurn
+                );
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/monitor").await?,
+                    StopReason::EndTurn
+                );
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let monitor_text = notifications
+            .iter()
+            .filter_map(|n| match &n.update {
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("Thread monitor") => Some(text.as_str()),
+                _ => None,
+            })
+            .next_back()
+            .expect("expected /monitor output");
+
+        assert!(
+            monitor_text.contains("Verify: run /status, /monitor, and /vector"),
+            "monitor output should include current setup plan steps. notifications={notifications:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_setup_plan_verification_progress_updates() -> anyhow::Result<()> {
         let (session_id, client, _, message_tx, local_set) = setup(vec![]).await?;
 
@@ -6194,6 +6242,63 @@ mod tests {
             verify_step.status,
             PlanEntryStatus::Completed,
             "verify step should be completed after running /status, /monitor, /vector"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monitoring_auto_mode_clears_completed_prompt_tasks() -> anyhow::Result<()> {
+        let (session_id, client, _, message_tx, local_set) = setup(vec![]).await?;
+
+        async fn send_prompt(
+            message_tx: &UnboundedSender<ThreadMessage>,
+            session_id: &SessionId,
+            prompt: &str,
+        ) -> anyhow::Result<StopReason> {
+            let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+            message_tx.send(ThreadMessage::Prompt {
+                request: PromptRequest::new(session_id.clone(), vec![prompt.into()]),
+                response_tx: prompt_response_tx,
+            })?;
+            Ok(prompt_response_rx.await??.await??)
+        }
+
+        tokio::try_join!(
+            async {
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "hello").await?,
+                    StopReason::EndTurn
+                );
+                assert_eq!(
+                    send_prompt(&message_tx, &session_id, "/monitor").await?,
+                    StopReason::EndTurn
+                );
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let monitor_text = notifications
+            .iter()
+            .filter_map(|n| match &n.update {
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("Thread monitor") => Some(text.as_str()),
+                _ => None,
+            })
+            .next_back()
+            .expect("expected /monitor output");
+
+        assert!(
+            !monitor_text.contains("Task queue:"),
+            "auto mode should hide task queue after completed prompts. notifications={notifications:?}"
         );
 
         Ok(())
