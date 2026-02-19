@@ -1,38 +1,38 @@
 {
-	"name": "@haegyung/xsfire-camp",
-	"version": "0.9.10",
-	"type": "module",
-	"description": "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends.",
-	"license": "CC-BY-NC-SA-4.0",
-	"author": "haegyung <g@theprometheus.xyz>",
-	"homepage": "https://github.com/haegyung/xsfire-camp",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/haegyung/xsfire-camp.git"
-	},
-	"bugs": {
-		"url": "https://github.com/haegyung/xsfire-camp/issues"
-	},
-	"keywords": [
-		"codex",
-		"acp",
-		"agent",
-		"coding",
-		"ai",
-		"assistant"
-	],
-	"bin": {
-		"xsfire-camp": "bin/xsfire-camp.js"
-	},
-	"files": [
-		"bin"
-	],
-	"optionalDependencies": {
-		"@haegyung/xsfire-camp-darwin-arm64": "0.9.10",
-		"@haegyung/xsfire-camp-darwin-x64": "0.9.10",
-		"@haegyung/xsfire-camp-linux-arm64": "0.9.10",
-		"@haegyung/xsfire-camp-linux-x64": "0.9.10",
-		"@haegyung/xsfire-camp-win32-arm64": "0.9.10",
-		"@haegyung/xsfire-camp-win32-x64": "0.9.10"
-	}
+  "name": "@haegyung/xsfire-camp",
+  "version": "0.9.11",
+  "type": "module",
+  "description": "ACP IDE bridge for Codex CLI with structured tool/plan/approval session logs; currently Codex-only, targeting multi-LLM and multi-CLI backends.",
+  "license": "CC-BY-NC-SA-4.0",
+  "author": "haegyung <g@theprometheus.xyz>",
+  "homepage": "https://github.com/haegyung/xsfire-camp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haegyung/xsfire-camp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/haegyung/xsfire-camp/issues"
+  },
+  "keywords": [
+    "codex",
+    "acp",
+    "agent",
+    "coding",
+    "ai",
+    "assistant"
+  ],
+  "bin": {
+    "xsfire-camp": "bin/xsfire-camp.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "optionalDependencies": {
+    "@haegyung/xsfire-camp-darwin-arm64": "0.9.11",
+    "@haegyung/xsfire-camp-darwin-x64": "0.9.11",
+    "@haegyung/xsfire-camp-linux-arm64": "0.9.11",
+    "@haegyung/xsfire-camp-linux-x64": "0.9.11",
+    "@haegyung/xsfire-camp-win32-arm64": "0.9.11",
+    "@haegyung/xsfire-camp-win32-x64": "0.9.11"
+  }
 }
