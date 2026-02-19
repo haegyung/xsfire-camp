@@ -6,11 +6,12 @@ use agent_client_protocol::{
     SetSessionModeResponse, SetSessionModelRequest, SetSessionModelResponse,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackendKind {
     Codex,
     ClaudeCode,
     Gemini,
+    Multi,
 }
 
 impl BackendKind {
@@ -19,6 +20,7 @@ impl BackendKind {
             "codex" => Some(Self::Codex),
             "claude-code" | "claude" => Some(Self::ClaudeCode),
             "gemini" | "gemini-cli" => Some(Self::Gemini),
+            "multi" | "all" => Some(Self::Multi),
             _ => None,
         }
     }
@@ -28,6 +30,7 @@ impl BackendKind {
             Self::Codex => "codex",
             Self::ClaudeCode => "claude-code",
             Self::Gemini => "gemini",
+            Self::Multi => "multi",
         }
     }
 }
@@ -35,6 +38,10 @@ impl BackendKind {
 #[async_trait::async_trait(?Send)]
 pub trait BackendDriver {
     fn backend_kind(&self) -> BackendKind;
+
+    fn supports_load_session(&self) -> bool {
+        self.backend_kind() == BackendKind::Codex
+    }
 
     fn auth_methods(&self) -> Vec<AuthMethod>;
 

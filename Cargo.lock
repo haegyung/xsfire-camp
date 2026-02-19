@@ -6546,7 +6546,7 @@ dependencies = [
 
 [[package]]
 name = "xsfire-camp"
-version = "0.9.12"
+version = "0.9.13"
 dependencies = [
  "agent-client-protocol",
  "anyhow",

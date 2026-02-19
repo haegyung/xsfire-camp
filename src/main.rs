@@ -14,7 +14,7 @@ fn extract_backend_arg(args: &mut Vec<std::ffi::OsString>) -> anyhow::Result<Bac
         let arg = args[i].to_string_lossy();
         if arg == "--backend" {
             let Some(value) = args.get(i + 1) else {
-                anyhow::bail!("--backend requires a value (codex|claude-code|gemini)");
+                anyhow::bail!("--backend requires a value (codex|claude-code|gemini|multi)");
             };
             let value = value.to_string_lossy();
             backend = BackendKind::parse(&value)

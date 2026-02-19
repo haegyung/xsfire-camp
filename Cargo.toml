@@ -1,6 +1,6 @@
 [package]
 name = "xsfire-camp"
-version = "0.9.12"
+version = "0.9.13"
 edition = "2024"
 authors = ["haegyung <g@theprometheus.xyz>"]
 license = "CC-BY-NC-SA-4.0"

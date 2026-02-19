@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tracing::debug;
 
-use crate::backend::{BackendDriver, BackendKind};
+use crate::backend::BackendDriver;
 
 pub struct AcpAgent {
     driver: Rc<dyn BackendDriver>,
@@ -44,7 +44,7 @@ impl Agent for AcpAgent {
 
         *self.client_capabilities.lock().unwrap() = client_capabilities;
 
-        let load_session = self.driver.backend_kind() == BackendKind::Codex;
+        let load_session = self.driver.supports_load_session();
         let mut agent_capabilities = AgentCapabilities::new()
             .prompt_capabilities(PromptCapabilities::new().embedded_context(true).image(true))
             .mcp_capabilities(McpCapabilities::new().http(true))

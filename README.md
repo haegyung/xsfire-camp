@@ -31,7 +31,7 @@ Language: [한국어](#총정리-kr) | [English](#overview-en)
 
 - ACP 표준 I/O(stdio)로 동작하는 Codex 에이전트
 - 세션 저장소 공유: ACP `session_id`를 Codex thread id와 동일하게 사용하고, 세션 소스를 CLI와 맞춰 동일한 세션 저장소(`CODEX_HOME`)를 사용
-- (옵션) 글로벌 세션 저장소: backend-native 로그는 분리한 채, `ACP_HOME`(기본 `~/.acp`)에 canonical 작업 로그(JSONL)를 추가로 남겨 “모델/클라이언트가 바뀌어도” 맥락을 이어가기 쉽게 함 (`docs/backend/session_store.md`)
+- 글로벌 세션 저장소(기본 활성): backend-native 로그는 분리한 채, `ACP_HOME`(기본 `~/.acp`)에 canonical 작업 로그(JSONL)를 추가로 남겨 “모델/클라이언트가 바뀌어도” 맥락을 이어가기 쉽게 함 (`docs/backend/session_store.md`)
 - Embedded context / @-mentions, 이미지 입력 지원(클라이언트가 제공할 때)
 - Tool calls(쉘 실행, apply_patch, 웹 검색, MCP tool call 등) 스트리밍 및 결과 업데이트
 - 승인(Approvals) 플로우: 실행/패치 등 위험 동작을 `RequestPermission`으로 노출하고 사용자 선택을 반영
@@ -59,8 +59,8 @@ Language: [한국어](#총정리-kr) | [English](#overview-en)
 
 ### 로드맵 (요약)
 
-- 지금: backend driver(드라이버) 경계로 분리하고 `--backend` 플래그를 추가했습니다(현재 `codex`만 구현). Codex CLI를 ACP 에이전트로 연결하고 `CODEX_HOME`을 공유해 IDE/CLI 간 세션을 이어갑니다.
-- 다음: Claude Code/Gemini CLI 같은 **CLI 기반 백엔드** 드라이버를 구현하고, 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존합니다.
+- 지금: backend driver(드라이버) 경계를 유지하면서 `--backend=multi`를 통해 Codex/Claude/Gemini를 한 프로세스에서 라우팅할 수 있습니다. 스레드 안에서 `/backend <codex|claude-code|gemini>`로 전환 가능합니다.
+- 다음: 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존하고, backend 간 세션/컨텍스트 동기화를 더 정교하게 만듭니다.
 - 나중: canonical 로그 스키마/상관관계 ID/보안(레닥션) 정책을 강화해 “모델이 바뀌어도” 작업 맥락을 더 안정적으로 이어가게 합니다.
 
 자세한 계획: `docs/plans/roadmap.md`, `docs/backend/backends.md`, `docs/backend/session_store.md`, `docs/backend/policies.md`.
@@ -95,7 +95,7 @@ Language: [한국어](#총정리-kr) | [English](#overview-en)
 - ACP 클라이언트(예: Zed) 또는 ACP를 실행할 수 있는 클라이언트
 - 인증: `OPENAI_API_KEY` 또는 `CODEX_API_KEY` 또는 ChatGPT subscription(환경에 따라)
 - 동일한 사용자 계정에서 `CODEX_HOME`을 공유하는 것을 권장
-- (옵션) 글로벌 canonical 로그: `ACP_HOME` (기본 `~/.acp`) 및 정책은 `docs/backend/session_store.md`, `docs/backend/policies.md` 참고
+- 글로벌 canonical 로그(기본 활성): `ACP_HOME` (기본 `~/.acp`) 및 정책은 `docs/backend/session_store.md`, `docs/backend/policies.md` 참고
 
 ### 설치/실행 (바이너리)
 
@@ -123,12 +123,15 @@ OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 target/release/xsfire-camp --backend=codex
 target/release/xsfire-camp --backend=claude-code
 target/release/xsfire-camp --backend=gemini
+target/release/xsfire-camp --backend=multi
 ```
 
 참고:
 
 - `claude-code`/`gemini` 백엔드는 현재 최소 구현(원샷 프롬프트 위주)입니다. `claude`/`gemini` CLI가 설치되어 있고, CLI 자체에서 인증이 완료되어 있어야 합니다.
 - 필요하면 실행 바이너리/추가 플래그를 env로 오버라이드할 수 있습니다: `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`, `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE`.
+- `--backend=multi`에서는 스레드 안에서 `/backend codex`, `/backend claude-code`, `/backend gemini`로 전환할 수 있습니다.
+- 인증은 `authenticate` method id 기준으로 라우팅됩니다. `chatgpt`/`codex-api-key`/`openai-api-key`는 Codex로, `claude-cli`/`gemini-cli`는 각 CLI 백엔드로 전달됩니다.
 
 ### Zed (custom agent registration)
 
@@ -219,7 +222,7 @@ It is designed so ACP sessions and CLI sessions can share the same `CODEX_HOME` 
 - ACP stdio agent wrapper for Codex
 - Session continuity:
   ACP `session_id` is aligned with Codex thread identity and shared session metadata in `CODEX_HOME`
-- Optional canonical global logging via `ACP_HOME` (default `~/.acp`) while preserving backend-native logs
+- Canonical global logging is enabled by default via `ACP_HOME` (default `~/.acp`) while preserving backend-native logs
 - Embedded context / mentions and image input support (when client supports it)
 - Tool-call streaming and result updates (shell, `apply_patch`, web search, MCP tools)
 - Approval flow surfaced through ACP `RequestPermission`
@@ -260,12 +263,15 @@ Backend selection (default: `codex`):
 target/release/xsfire-camp --backend=codex
 target/release/xsfire-camp --backend=claude-code
 target/release/xsfire-camp --backend=gemini
+target/release/xsfire-camp --backend=multi
 ```
 
 Notes:
 
 - `claude-code` / `gemini` are minimal backend implementations at this stage.
 - Those CLIs must be installed and authenticated separately.
+- In `--backend=multi`, switch inside a thread with `/backend codex`, `/backend claude-code`, or `/backend gemini`.
+- Authentication dispatch is method-id based: `chatgpt` / `codex-api-key` / `openai-api-key` route to Codex, while `claude-cli` / `gemini-cli` route to each CLI backend.
 
 ### Quick Start (npm)
 
