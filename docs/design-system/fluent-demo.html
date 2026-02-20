@@ -125,6 +125,114 @@
                 gap: var(--ms-spacing-12);
             }
 
+            .settings-layout {
+                display: grid;
+                gap: var(--ms-spacing-16);
+            }
+
+            .settings-grid {
+                display: grid;
+                gap: var(--ms-spacing-12);
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .settings-field-full {
+                grid-column: 1 / -1;
+            }
+
+            .settings-label-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: var(--ms-spacing-8);
+            }
+
+            .required-mark {
+                color: var(--ms-color-status-danger);
+                font-weight: var(--ms-font-weight-bold);
+            }
+
+            .choice-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: var(--ms-spacing-8);
+            }
+
+            .pill {
+                border: 1px solid var(--ms-color-surface-border);
+                background: var(--ms-color-background-subtle);
+                color: var(--ms-color-foreground-default);
+                border-radius: var(--ms-radius-full);
+                padding: 6px 12px;
+                font-size: var(--ms-font-size-caption);
+                font-weight: var(--ms-font-weight-semibold);
+                cursor: pointer;
+            }
+
+            .pill[data-selected="true"] {
+                border-color: var(--ms-color-brand-focus);
+                background: var(--ms-color-brand-selected);
+            }
+
+            .helper-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: var(--ms-spacing-8);
+            }
+
+            .status-badge {
+                display: inline-flex;
+                align-items: center;
+                border-radius: var(--ms-radius-full);
+                padding: 3px 10px;
+                font-size: var(--ms-font-size-caption);
+                border: 1px solid var(--ms-color-surface-border);
+                background: var(--ms-color-background-subtle);
+                color: var(--ms-color-foreground-muted);
+            }
+
+            .status-badge[data-state="valid"] {
+                border-color: rgba(16, 124, 16, 0.35);
+                color: var(--ms-color-status-success);
+            }
+
+            .status-badge[data-state="invalid"] {
+                border-color: rgba(209, 52, 56, 0.35);
+                color: var(--ms-color-status-danger);
+            }
+
+            .inline-note {
+                margin: 0;
+                font-size: var(--ms-font-size-caption);
+                color: var(--ms-color-foreground-muted);
+            }
+
+            .danger-box {
+                border: 1px solid rgba(209, 52, 56, 0.35);
+                background: color-mix(
+                    in srgb,
+                    var(--ms-color-status-danger) 7%,
+                    var(--ms-color-surface-card)
+                );
+                border-radius: var(--ms-radius-medium);
+                padding: var(--ms-spacing-12);
+                display: grid;
+                gap: var(--ms-spacing-8);
+            }
+
+            .save-row {
+                display: flex;
+                align-items: center;
+                gap: var(--ms-spacing-8);
+                flex-wrap: wrap;
+            }
+
+            .save-row .ms-fluent-button[aria-disabled="true"] {
+                opacity: 0.6;
+                pointer-events: none;
+            }
+
             .button-row {
                 display: flex;
                 gap: var(--ms-spacing-8);
@@ -196,6 +304,10 @@
                     padding: var(--ms-spacing-16);
                     box-shadow: 0 14px 30px rgba(0, 76, 138, 0.21);
                 }
+
+                .settings-grid {
+                    grid-template-columns: 1fr;
+                }
             }
         </style>
     </head>
@@ -252,22 +364,172 @@
                 </section>
 
                 <section class="ms-fluent-card panel">
+                    <h2 class="panel-title">Safe Settings Form</h2>
+                    <div class="settings-layout">
+                        <p class="inline-note">
+                            필수 설정을 먼저 완료해야 저장 가능하도록
+                            구성했습니다. 실시간 검증 결과는 우측 상태 배지
+                            1곳에서만 보여줍니다.
+                        </p>
+
+                        <div class="settings-grid">
+                            <div class="ms-fluent-field">
+                                <div class="settings-label-row">
+                                    <label
+                                        class="ms-fluent-label"
+                                        for="demo-env"
+                                    >
+                                        실행 환경
+                                        <span class="required-mark">*</span>
+                                    </label>
+                                </div>
+                                <div
+                                    class="choice-row"
+                                    id="demo-env"
+                                    role="group"
+                                    aria-label="실행 환경 선택"
+                                >
+                                    <button
+                                        class="pill"
+                                        data-value="production"
+                                        data-selected="true"
+                                    >
+                                        Production
+                                    </button>
+                                    <button
+                                        class="pill"
+                                        data-value="staging"
+                                        data-selected="false"
+                                    >
+                                        Staging
+                                    </button>
+                                    <button
+                                        class="pill"
+                                        data-value="sandbox"
+                                        data-selected="false"
+                                    >
+                                        Sandbox
+                                    </button>
+                                </div>
+                                <small class="ms-fluent-helper">
+                                    기본값을 명시해 오입력 없이 바로 시작합니다.
+                                </small>
+                            </div>
+
+                            <div class="ms-fluent-field">
+                                <div class="settings-label-row">
+                                    <label
+                                        class="ms-fluent-label"
+                                        for="demo-model"
+                                    >
+                                        모델 등급
+                                        <span class="required-mark">*</span>
+                                    </label>
+                                </div>
+                                <select id="demo-model" class="ms-fluent-input">
+                                    <option value="">선택하세요</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="balanced">Balanced</option>
+                                    <option value="advanced">Advanced</option>
+                                </select>
+                                <small class="ms-fluent-helper">
+                                    난이도 선택이 누락되면 저장을 막습니다.
+                                </small>
+                            </div>
+
+                            <div class="ms-fluent-field settings-field-full">
+                                <div class="settings-label-row">
+                                    <label
+                                        class="ms-fluent-label"
+                                        for="demo-endpoint"
+                                    >
+                                        API Endpoint
+                                        <span class="required-mark">*</span>
+                                    </label>
+                                    <span
+                                        id="endpointState"
+                                        class="status-badge"
+                                        data-state="idle"
+                                    >
+                                        입력 대기
+                                    </span>
+                                </div>
+                                <input
+                                    id="demo-endpoint"
+                                    class="ms-fluent-input"
+                                    placeholder="https://api.example.com/v1"
+                                    aria-describedby="endpointHelp"
+                                />
+                                <div class="helper-row">
+                                    <small
+                                        id="endpointHelp"
+                                        class="ms-fluent-helper"
+                                    >
+                                        `https://` 시작 + 호스트 + 경로 형식만
+                                        허용
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="ms-fluent-field settings-field-full">
+                                <div class="settings-label-row">
+                                    <label
+                                        class="ms-fluent-label"
+                                        for="demo-email"
+                                    >
+                                        알림 이메일
+                                    </label>
+                                </div>
+                                <input
+                                    id="demo-email"
+                                    class="ms-fluent-input"
+                                    placeholder="you@example.com"
+                                />
+                                <small class="ms-fluent-helper">
+                                    선택 입력입니다. 빈 값은 저장 가능하며,
+                                    입력했을 때만 형식을 검사합니다.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="danger-box">
+                            <strong>위험 액션 보호</strong>
+                            <p class="inline-note">
+                                대규모 재동기화는 즉시 반영됩니다. 체크 후에만
+                                실행 버튼이 활성화됩니다.
+                            </p>
+                            <label class="ms-fluent-label" for="dangerAck">
+                                <input type="checkbox" id="dangerAck" />
+                                영향 범위를 이해했고 실행을 승인합니다.
+                            </label>
+                            <button
+                                id="dangerButton"
+                                class="ms-fluent-button ms-fluent-button-secondary"
+                                disabled
+                            >
+                                재동기화 실행
+                            </button>
+                        </div>
+
+                        <div class="save-row">
+                            <button
+                                id="saveButton"
+                                class="ms-fluent-button"
+                                aria-disabled="true"
+                            >
+                                설정 저장
+                            </button>
+                            <p id="saveHint" class="inline-note">
+                                필수 항목 3개를 완료하면 저장 버튼이
+                                활성화됩니다.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="ms-fluent-card panel">
                     <h2 class="panel-title">Component State</h2>
                     <div class="surface-grid">
-                        <div class="ms-fluent-field">
-                            <label class="ms-fluent-label" for="demo-email"
-                                >Email</label
-                            >
-                            <input
-                                id="demo-email"
-                                class="ms-fluent-input"
-                                placeholder="you@example.com"
-                            />
-                            <small class="ms-fluent-helper"
-                                >helper text는 `aria-describedby`로 연결되는
-                                구조를 권장합니다.</small
-                            >
-                        </div>
                         <div class="ms-fluent-field">
                             <label class="ms-fluent-label" for="demo-search"
                                 >검색</label
@@ -370,6 +632,16 @@
                 const themeButtons = Array.from(
                     document.querySelectorAll(".theme-button"),
                 );
+                const envButtons = Array.from(
+                    document.querySelectorAll("#demo-env .pill"),
+                );
+                const modelSelect = document.getElementById("demo-model");
+                const endpointInput = document.getElementById("demo-endpoint");
+                const endpointState = document.getElementById("endpointState");
+                const saveButton = document.getElementById("saveButton");
+                const saveHint = document.getElementById("saveHint");
+                const dangerAck = document.getElementById("dangerAck");
+                const dangerButton = document.getElementById("dangerButton");
                 const currentTheme = document.getElementById("currentTheme");
                 const reducedMotion = document.getElementById("reducedMotion");
                 const forcedColors = document.getElementById("forcedColors");
@@ -407,6 +679,77 @@
                         : "off";
                 }
 
+                function isValidHttpsUrl(value) {
+                    if (!value) return false;
+                    try {
+                        const parsed = new URL(value);
+                        return (
+                            parsed.protocol === "https:" &&
+                            parsed.hostname.length > 1
+                        );
+                    } catch {
+                        return false;
+                    }
+                }
+
+                function getSelectedEnvironment() {
+                    return envButtons.find(
+                        (button) =>
+                            button.getAttribute("data-selected") === "true",
+                    );
+                }
+
+                function updateSettingsState() {
+                    const hasEnvironment = Boolean(getSelectedEnvironment());
+                    const hasModel = Boolean(modelSelect.value);
+                    const endpointValue = endpointInput.value.trim();
+                    const endpointValid = isValidHttpsUrl(endpointValue);
+
+                    if (!endpointValue) {
+                        endpointState.dataset.state = "idle";
+                        endpointState.textContent = "입력 대기";
+                    } else if (endpointValid) {
+                        endpointState.dataset.state = "valid";
+                        endpointState.textContent = "유효한 주소";
+                    } else {
+                        endpointState.dataset.state = "invalid";
+                        endpointState.textContent = "형식 오류";
+                    }
+
+                    const canSave = hasEnvironment && hasModel && endpointValid;
+                    saveButton.setAttribute(
+                        "aria-disabled",
+                        canSave ? "false" : "true",
+                    );
+                    saveHint.textContent = canSave
+                        ? "저장 가능: 필수 항목이 모두 유효합니다."
+                        : "필수 항목 3개를 완료하면 저장 버튼이 활성화됩니다.";
+                }
+
+                function bindSettingsEvents() {
+                    envButtons.forEach((button) => {
+                        button.addEventListener("click", () => {
+                            envButtons.forEach((candidate) => {
+                                candidate.setAttribute(
+                                    "data-selected",
+                                    candidate === button ? "true" : "false",
+                                );
+                            });
+                            updateSettingsState();
+                        });
+                    });
+
+                    modelSelect.addEventListener("change", updateSettingsState);
+                    endpointInput.addEventListener(
+                        "input",
+                        updateSettingsState,
+                    );
+
+                    dangerAck.addEventListener("change", () => {
+                        dangerButton.disabled = !dangerAck.checked;
+                    });
+                }
+
                 function bindQueryChange(mediaQueryList, handler) {
                     if (typeof mediaQueryList.addEventListener === "function") {
                         mediaQueryList.addEventListener("change", handler);
@@ -426,6 +769,8 @@
 
                 applyTheme(root.getAttribute("data-ms-theme") || "light");
                 updateSystemState();
+                bindSettingsEvents();
+                updateSettingsState();
                 bindQueryChange(motionQuery, updateSystemState);
                 bindQueryChange(forcedColorsQuery, updateSystemState);
             </script>

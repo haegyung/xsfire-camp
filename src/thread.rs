@@ -91,6 +91,8 @@ const MONITOR_PANEL_WIDTH_MIN: usize = 56;
 const MONITOR_PANEL_WIDTH_MAX: usize = 132;
 const MONITOR_PROGRESS_BAR_MIN_WIDTH: usize = 18;
 const MONITOR_PROGRESS_BAR_MAX_WIDTH: usize = 40;
+const CONFIG_OPTIONS_DENSITY_ENV: &str = "XSFIRE_CONFIG_OPTIONS_DENSITY";
+const CONFIG_OPTIONS_INLINE_FULL_MIN_COLUMNS: usize = 140;
 
 #[derive(Clone, Debug)]
 struct SessionListEntry {
@@ -202,6 +204,54 @@ impl MonitorMode {
 
     fn is_detail(&self) -> bool {
         matches!(self, Self::Detail)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ConfigOptionsDensity {
+    Compact,
+    Full,
+}
+
+impl ConfigOptionsDensity {
+    fn from_env() -> Self {
+        match std::env::var(CONFIG_OPTIONS_DENSITY_ENV)
+            .ok()
+            .as_deref()
+            .map(str::trim)
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("full") => Self::Full,
+            _ => Self::Compact,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AdvancedOptionsPanel {
+    Context,
+    Tasks,
+    Beta,
+}
+
+impl AdvancedOptionsPanel {
+    fn from_config_value(raw: &str) -> Result<Self, Error> {
+        match raw {
+            "context" => Ok(Self::Context),
+            "tasks" => Ok(Self::Tasks),
+            "beta" => Ok(Self::Beta),
+            _ => Err(Error::invalid_params()
+                .data("Advanced Panel values must be one of: context, tasks, beta")),
+        }
+    }
+
+    fn as_config_value(self) -> &'static str {
+        match self {
+            Self::Context => "context",
+            Self::Tasks => "tasks",
+            Self::Beta => "beta",
+        }
     }
 }
 
@@ -2274,6 +2324,8 @@ struct ThreadActor<A> {
     context_optimization: ContextOptimizationState,
     /// Task-level monitoring defaults and orchestration behavior.
     task_monitoring: TaskMonitoringState,
+    /// Selected advanced config panel for narrow client widths.
+    advanced_options_panel: AdvancedOptionsPanel,
     /// Setup wizard becomes "live" after `/setup` is first invoked.
     setup_wizard_active: bool,
     /// Tracks setup verification checks to keep Plan progress accurate.
@@ -2304,6 +2356,7 @@ impl<A: Auth> ThreadActor<A> {
             last_session_list: Vec::new(),
             context_optimization: ContextOptimizationState::default(),
             task_monitoring: TaskMonitoringState::default(),
+            advanced_options_panel: AdvancedOptionsPanel::Context,
             setup_wizard_active: false,
             setup_wizard_progress: SetupWizardProgressState::default(),
             flow_vector: FlowVectorState::default(),
@@ -2597,6 +2650,13 @@ impl<A: Auth> ThreadActor<A> {
 
     async fn config_options(&self) -> Result<Vec<SessionConfigOption>, Error> {
         let mut options = Vec::new();
+        let show_advanced_options =
+            matches!(ConfigOptionsDensity::from_env(), ConfigOptionsDensity::Full);
+        let inline_all_advanced = std::env::var("COLUMNS")
+            .ok()
+            .and_then(|raw| raw.parse::<usize>().ok())
+            .unwrap_or(MONITOR_PANEL_WIDTH_DEFAULT)
+            >= CONFIG_OPTIONS_INLINE_FULL_MIN_COLUMNS;
 
         if let Some(modes) = self.modes() {
             let select_options = modes
@@ -2709,122 +2769,158 @@ impl<A: Auth> ThreadActor<A> {
             .description("Choose a communication style for responses"),
         );
 
-        let context_mode = self.context_optimization.mode.as_config_value();
-        options.push(
-            SessionConfigOption::select(
-                "context_optimization_mode",
-                "Context Optimization",
-                context_mode,
-                vec![
-                    SessionConfigSelectOption::new("off", "Off")
-                        .description("Disable proactive context optimization telemetry/actions"),
-                    SessionConfigSelectOption::new("monitor", "Monitor")
-                        .description("Collect context telemetry only; no auto-compaction"),
-                    SessionConfigSelectOption::new("auto", "Auto").description(
-                        "Automatically compact history when context usage crosses threshold",
+        if show_advanced_options {
+            if !inline_all_advanced {
+                options.push(
+                    SessionConfigOption::select(
+                        "advanced_options_panel",
+                        "Advanced Panel",
+                        self.advanced_options_panel.as_config_value(),
+                        vec![
+                            SessionConfigSelectOption::new("context", "Context"),
+                            SessionConfigSelectOption::new("tasks", "Tasks"),
+                            SessionConfigSelectOption::new("beta", "Beta"),
+                        ],
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description(
+                        "Switch which advanced option group is shown in compact-width layouts",
                     ),
-                ],
-            )
-            .category(SessionConfigOptionCategory::Other)
-            .description("Controls context-window monitoring and automatic optimization behavior"),
-        );
+                );
+            }
 
-        let trigger_options = CONTEXT_OPT_TRIGGER_PERCENT_OPTIONS
-            .iter()
-            .map(|percent| {
-                SessionConfigSelectOption::new(percent.to_string(), format!("{percent}%"))
-                    .description(format!(
-                        "Trigger automatic context compaction at or above {percent}% usage"
-                    ))
-            })
-            .collect::<Vec<_>>();
-        options.push(
-            SessionConfigOption::select(
-                "context_optimization_trigger_percent",
-                "Context Trigger Threshold",
-                self.context_optimization.trigger_percent.to_string(),
-                trigger_options,
-            )
-            .category(SessionConfigOptionCategory::Other)
-            .description("Threshold used when Context Optimization is set to Auto"),
-        );
+            let show_context = inline_all_advanced
+                || matches!(self.advanced_options_panel, AdvancedOptionsPanel::Context);
+            let show_tasks = inline_all_advanced
+                || matches!(self.advanced_options_panel, AdvancedOptionsPanel::Tasks);
+            let show_beta = inline_all_advanced
+                || matches!(self.advanced_options_panel, AdvancedOptionsPanel::Beta);
 
-        options.push(
-            SessionConfigOption::select(
-                "task_orchestration_mode",
-                "Task Orchestration",
-                self.task_monitoring.orchestration_mode.as_config_value(),
-                vec![
-                    SessionConfigSelectOption::new("parallel", "Parallel").description(
-                        "Run independent prompt/task flows concurrently (recommended default)",
-                    ),
-                    SessionConfigSelectOption::new("sequential", "Sequential")
-                        .description("Queue prompt/task flows one-by-one"),
-                ],
-            )
-            .category(SessionConfigOptionCategory::Other)
-            .description("Controls prompt/task orchestration strategy"),
-        );
+            if show_context {
+                let context_mode = self.context_optimization.mode.as_config_value();
+                options.push(
+                    SessionConfigOption::select(
+                        "context_optimization_mode",
+                        "Context Optimization",
+                        context_mode,
+                        vec![
+                            SessionConfigSelectOption::new("off", "Off")
+                                .description("Disable proactive context optimization telemetry/actions"),
+                            SessionConfigSelectOption::new("monitor", "Monitor")
+                                .description("Collect context telemetry only; no auto-compaction"),
+                            SessionConfigSelectOption::new("auto", "Auto").description(
+                                "Automatically compact history when context usage crosses threshold",
+                            ),
+                        ],
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description("Controls context-window monitoring and automatic optimization behavior"),
+                );
 
-        options.push(
-            SessionConfigOption::select(
-                "task_monitoring_enabled",
-                "Task Monitoring",
-                self.task_monitoring.monitor_mode.as_config_value(),
-                vec![
-                    SessionConfigSelectOption::new("on", "On")
-                        .description("Track active tasks and expose per-task progress in /monitor"),
-                    SessionConfigSelectOption::new("auto", "Auto")
-                        .description("Monitor task queue automatically while active tasks exist"),
-                    SessionConfigSelectOption::new("off", "Off")
-                        .description("Disable task-level monitor reporting"),
-                ],
-            )
-            .category(SessionConfigOptionCategory::Other)
-            .description("Enable or disable task-level monitoring"),
-        );
+                let trigger_options = CONTEXT_OPT_TRIGGER_PERCENT_OPTIONS
+                    .iter()
+                    .map(|percent| {
+                        SessionConfigSelectOption::new(percent.to_string(), format!("{percent}%"))
+                            .description(format!(
+                                "Trigger automatic context compaction at or above {percent}% usage"
+                            ))
+                    })
+                    .collect::<Vec<_>>();
+                options.push(
+                    SessionConfigOption::select(
+                        "context_optimization_trigger_percent",
+                        "Context Trigger Threshold",
+                        self.context_optimization.trigger_percent.to_string(),
+                        trigger_options,
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description("Threshold used when Context Optimization is set to Auto"),
+                );
+            }
 
-        options.push(
-            SessionConfigOption::select(
-                "task_vector_check_enabled",
-                "Progress Vector Checks",
-                if self.task_monitoring.vector_check_enabled {
-                    "on"
-                } else {
-                    "off"
-                },
-                vec![
-                    SessionConfigSelectOption::new("on", "On")
-                        .description("Show workflow vector/minimap checks in /monitor"),
-                    SessionConfigSelectOption::new("off", "Off")
-                        .description("Hide workflow vector checks from monitor output"),
-                ],
-            )
-            .category(SessionConfigOptionCategory::Other)
-            .description("Enable or disable progress vector checks"),
-        );
+            if show_tasks {
+                options.push(
+                    SessionConfigOption::select(
+                        "task_orchestration_mode",
+                        "Task Orchestration",
+                        self.task_monitoring.orchestration_mode.as_config_value(),
+                        vec![
+                            SessionConfigSelectOption::new("parallel", "Parallel").description(
+                                "Run independent prompt/task flows concurrently (recommended default)",
+                            ),
+                            SessionConfigSelectOption::new("sequential", "Sequential")
+                                .description("Queue prompt/task flows one-by-one"),
+                        ],
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description("Controls prompt/task orchestration strategy"),
+                );
 
-        for spec in experimental_feature_specs() {
-            let current = if self.config.features.enabled(spec.id) {
-                "on"
-            } else {
-                "off"
-            };
-            options.push(
-                SessionConfigOption::select(
-                    experimental_feature_config_id(spec.key),
-                    format!("Beta: {}", spec.name),
-                    current,
-                    vec![
-                        SessionConfigSelectOption::new("on", "On")
-                            .description("Enable this beta capability"),
-                        SessionConfigSelectOption::new("off", "Off")
-                            .description("Disable this beta capability"),
-                    ],
-                )
-                .category(SessionConfigOptionCategory::Other)
-                .description(spec.description),
-            );
+                options.push(
+                    SessionConfigOption::select(
+                        "task_monitoring_enabled",
+                        "Task Monitoring",
+                        self.task_monitoring.monitor_mode.as_config_value(),
+                        vec![
+                            SessionConfigSelectOption::new("on", "On").description(
+                                "Track active tasks and expose per-task progress in /monitor",
+                            ),
+                            SessionConfigSelectOption::new("auto", "Auto").description(
+                                "Monitor task queue automatically while active tasks exist",
+                            ),
+                            SessionConfigSelectOption::new("off", "Off")
+                                .description("Disable task-level monitor reporting"),
+                        ],
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description("Enable or disable task-level monitoring"),
+                );
+
+                options.push(
+                    SessionConfigOption::select(
+                        "task_vector_check_enabled",
+                        "Progress Vector Checks",
+                        if self.task_monitoring.vector_check_enabled {
+                            "on"
+                        } else {
+                            "off"
+                        },
+                        vec![
+                            SessionConfigSelectOption::new("on", "On")
+                                .description("Show workflow vector/minimap checks in /monitor"),
+                            SessionConfigSelectOption::new("off", "Off")
+                                .description("Hide workflow vector checks from monitor output"),
+                        ],
+                    )
+                    .category(SessionConfigOptionCategory::Other)
+                    .description("Enable or disable progress vector checks"),
+                );
+            }
+
+            if show_beta {
+                for spec in experimental_feature_specs() {
+                    let current = if self.config.features.enabled(spec.id) {
+                        "on"
+                    } else {
+                        "off"
+                    };
+                    options.push(
+                        SessionConfigOption::select(
+                            experimental_feature_config_id(spec.key),
+                            format!("Beta: {}", spec.name),
+                            current,
+                            vec![
+                                SessionConfigSelectOption::new("on", "On")
+                                    .description("Enable this beta capability"),
+                                SessionConfigSelectOption::new("off", "Off")
+                                    .description("Disable this beta capability"),
+                            ],
+                        )
+                        .category(SessionConfigOptionCategory::Other)
+                        .description(spec.description),
+                    );
+                }
+            }
         }
 
         Ok(options)
@@ -2927,6 +3023,7 @@ impl<A: Auth> ThreadActor<A> {
             "model" => self.handle_set_config_model(value).await,
             "reasoning_effort" => self.handle_set_config_reasoning_effort(value).await,
             "personality" => self.handle_set_config_personality(value).await,
+            "advanced_options_panel" => self.handle_set_advanced_options_panel(value).await,
             "context_optimization_mode" => self.handle_set_context_optimization_mode(value).await,
             "context_optimization_trigger_percent" => {
                 self.handle_set_context_optimization_trigger(value).await
@@ -3068,6 +3165,15 @@ impl<A: Auth> ThreadActor<A> {
 
         self.config.model_personality = Some(personality);
 
+        Ok(())
+    }
+
+    async fn handle_set_advanced_options_panel(
+        &mut self,
+        value: SessionConfigValueId,
+    ) -> Result<(), Error> {
+        let panel = AdvancedOptionsPanel::from_config_value(value.0.as_ref())?;
+        self.advanced_options_panel = panel;
         Ok(())
     }
 
@@ -5247,6 +5353,68 @@ mod tests {
 
     use super::*;
 
+    struct EnvVarRestore {
+        key: String,
+        old: Option<String>,
+    }
+
+    impl EnvVarRestore {
+        fn set(key: &str, value: Option<&str>) -> Self {
+            let old = std::env::var(key).ok();
+            // Safe in tests when serialized by ENV_LOCK.
+            unsafe {
+                match value {
+                    Some(v) => std::env::set_var(key, v),
+                    None => std::env::remove_var(key),
+                }
+            }
+            Self {
+                key: key.to_string(),
+                old,
+            }
+        }
+    }
+
+    impl Drop for EnvVarRestore {
+        fn drop(&mut self) {
+            // Safe in tests when serialized by ENV_LOCK.
+            unsafe {
+                match &self.old {
+                    Some(value) => std::env::set_var(&self.key, value),
+                    None => std::env::remove_var(&self.key),
+                }
+            }
+        }
+    }
+
+    async fn test_actor_for_config_options() -> anyhow::Result<ThreadActor<StubAuth>> {
+        let session_id = SessionId::new("test-config-options");
+        let client = Arc::new(StubClient::new());
+        let thread = Arc::new(StubCodexThread::new());
+        let session_client =
+            SessionClient::with_client(session_id.clone(), client, Arc::default(), None);
+        let models_manager = Arc::new(StubModelsManager);
+        let config = Config::load_with_cli_overrides_and_harness_overrides(
+            vec![],
+            ConfigOverrides::default(),
+        )
+        .await?;
+        let (_message_tx, message_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        Ok(ThreadActor::new(
+            StubAuth,
+            session_client,
+            thread,
+            models_manager,
+            config,
+            message_rx,
+        ))
+    }
+
+    fn has_option(options: &[SessionConfigOption], id: &str) -> bool {
+        options.iter().any(|option| option.id.0.as_ref() == id)
+    }
+
     #[test]
     fn test_normalize_tool_name() {
         struct TestAuth;
@@ -6313,6 +6481,148 @@ mod tests {
         assert!(
             !monitor_text.contains("Task queue:"),
             "auto mode should hide task queue after completed prompts. notifications={notifications:?}"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_config_options_compact_density_hides_advanced_groups() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+        let _density_restore = EnvVarRestore::set(CONFIG_OPTIONS_DENSITY_ENV, Some("compact"));
+        let _columns_restore = EnvVarRestore::set("COLUMNS", Some("200"));
+        let actor = test_actor_for_config_options().await?;
+        let options = actor.config_options().await?;
+
+        assert!(!has_option(&options, "advanced_options_panel"));
+        assert!(!has_option(&options, "context_optimization_mode"));
+        assert!(!has_option(
+            &options,
+            "context_optimization_trigger_percent"
+        ));
+        assert!(!has_option(&options, "task_orchestration_mode"));
+        assert!(!has_option(&options, "task_monitoring_enabled"));
+        assert!(!has_option(&options, "task_vector_check_enabled"));
+        assert!(
+            !options.iter().any(|option| option
+                .id
+                .0
+                .as_ref()
+                .starts_with(FEATURE_CONFIG_ID_PREFIX))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_config_options_full_density_narrow_width_shows_panel_selector()
+    -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+        let _density_restore = EnvVarRestore::set(CONFIG_OPTIONS_DENSITY_ENV, Some("full"));
+        let _columns_restore = EnvVarRestore::set("COLUMNS", Some("120"));
+        let actor = test_actor_for_config_options().await?;
+        let options = actor.config_options().await?;
+
+        assert!(has_option(&options, "advanced_options_panel"));
+        assert!(has_option(&options, "context_optimization_mode"));
+        assert!(has_option(&options, "context_optimization_trigger_percent"));
+        assert!(!has_option(&options, "task_orchestration_mode"));
+        assert!(!has_option(&options, "task_monitoring_enabled"));
+        assert!(!has_option(&options, "task_vector_check_enabled"));
+        assert!(
+            !options.iter().any(|option| option
+                .id
+                .0
+                .as_ref()
+                .starts_with(FEATURE_CONFIG_ID_PREFIX))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_config_options_panel_switch_changes_visible_group() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+        let _density_restore = EnvVarRestore::set(CONFIG_OPTIONS_DENSITY_ENV, Some("full"));
+        let _columns_restore = EnvVarRestore::set("COLUMNS", Some("120"));
+        let mut actor = test_actor_for_config_options().await?;
+        actor.advanced_options_panel = AdvancedOptionsPanel::Tasks;
+        let options = actor.config_options().await?;
+
+        assert!(has_option(&options, "advanced_options_panel"));
+        assert!(!has_option(&options, "context_optimization_mode"));
+        assert!(!has_option(
+            &options,
+            "context_optimization_trigger_percent"
+        ));
+        assert!(has_option(&options, "task_orchestration_mode"));
+        assert!(has_option(&options, "task_monitoring_enabled"));
+        assert!(has_option(&options, "task_vector_check_enabled"));
+        assert!(
+            !options.iter().any(|option| option
+                .id
+                .0
+                .as_ref()
+                .starts_with(FEATURE_CONFIG_ID_PREFIX))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_config_options_full_density_wide_width_inlines_all_advanced_options()
+    -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+        let _density_restore = EnvVarRestore::set(CONFIG_OPTIONS_DENSITY_ENV, Some("full"));
+        let _columns_restore = EnvVarRestore::set("COLUMNS", Some("160"));
+        let actor = test_actor_for_config_options().await?;
+        let options = actor.config_options().await?;
+
+        assert!(!has_option(&options, "advanced_options_panel"));
+        assert!(has_option(&options, "context_optimization_mode"));
+        assert!(has_option(&options, "context_optimization_trigger_percent"));
+        assert!(has_option(&options, "task_orchestration_mode"));
+        assert!(has_option(&options, "task_monitoring_enabled"));
+        assert!(has_option(&options, "task_vector_check_enabled"));
+        assert!(
+            options
+                .iter()
+                .any(|option| option.id.0.as_ref().starts_with(FEATURE_CONFIG_ID_PREFIX))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_config_rejects_invalid_advanced_panel_value() -> anyhow::Result<()> {
+        let mut actor = test_actor_for_config_options().await?;
+        let err = actor
+            .handle_set_config_option(
+                SessionConfigId::new("advanced_options_panel"),
+                SessionConfigValueId::new("invalid"),
+            )
+            .await
+            .expect_err("invalid panel value should fail");
+
+        assert!(
+            format!("{err:?}")
+                .contains("Advanced Panel values must be one of: context, tasks, beta")
         );
 
         Ok(())
