@@ -50,7 +50,9 @@ Language: [한국어](#총정리-kr) | [English](#overview-en)
 - Tool calls(쉘 실행, apply_patch, 웹 검색, MCP tool call 등) 스트리밍 및 결과 업데이트
 - 승인(Approvals) 플로우: 실행/패치 등 위험 동작을 `RequestPermission`으로 노출하고 사용자 선택을 반영
 - Plan/TODO/Terminal 등 “작업 진행” 신호를 ACP `SessionUpdate`로 전달
+- 기본 실행 프로토콜(전 usecase 권장 기본값): `Goal 고정 -> Rubric(Must/Should+Evidence) -> Research -> Plan -> Implement -> Verify -> Score`를 반복하고, `Must` 100%까지 Plan UI를 계속 갱신
 - Codex CLI parity 중심의 slash commands 지원: `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status`, `/sessions`, `/load`, `/mcp`, `/skills` 등 (TIP: `/setup`은 Plan 패널에 체크리스트를 표시합니다)
+- `/skills` 옵션: `--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>` 지원(결과 하단에 사용 예시 출력)
 - 모니터링/UX 보조: `/monitor`(플랜/컨텍스트 사용량/트레이스), `/monitor retro`(회고형 리포트), `/vector`(워크플로 방향 미니맵/나침반), `/new-window`(새 스레드 안내), `/experimental`(베타 기능 토글 안내)
 - Custom prompts: 저장된 prompt를 `/name KEY=value` 형태로 호출, `$1..$9`, `$ARGUMENTS` 및 named placeholder 지원
 - MCP 서버 병합: ACP 클라이언트가 제공한 MCP 서버(HTTP/stdio)를 codex-rs 설정에 병합
@@ -61,7 +63,7 @@ Language: [한국어](#총정리-kr) | [English](#overview-en)
 | --- | --- |
 | Core | `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status` |
 | Session | `/sessions`, `/load` |
-| Integrations | `/mcp`, `/skills` |
+| Integrations | `/mcp`, `/skills` (`--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>`) |
 | Monitoring | `/monitor`, `/monitor retro`, `/vector`, `/experimental` |
 | UX | `/new-window` |
 
@@ -263,8 +265,12 @@ It is designed so ACP sessions and CLI sessions can share the same `CODEX_HOME` 
 - Tool-call streaming and result updates (shell, `apply_patch`, web search, MCP tools)
 - Approval flow surfaced through ACP `RequestPermission`
 - Plan/TODO/terminal progression updates via ACP `SessionUpdate`
+- Default execution protocol (baseline for all use cases):
+  `Goal lock -> Rubric (Must/Should + evidence) -> Research -> Plan -> Implement -> Verify -> Score`, iterating until `Must=100%` with continuous Plan UI updates
 - Slash-command parity focus:
   `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status`, `/sessions`, `/load`, `/mcp`, `/skills`, `/monitor`, `/monitor retro`, `/vector`, `/new-window`, `/experimental`
+- `/skills` options:
+  `--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>` (usage/examples are shown in the `/skills` response)
 - MCP server merge:
   client-provided MCP endpoints are merged into codex-rs configuration
 

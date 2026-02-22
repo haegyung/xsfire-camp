@@ -21,6 +21,8 @@
 ## Setup wizard / task monitoring 보강 동작
 
 - `/setup`를 한 번 실행하면 setup wizard plan이 활성화됩니다.
+- setup wizard plan은 기본 실행 프로토콜(`Goal -> Rubric -> Research -> Plan -> Implement -> Verify -> Score`)과
+  `Must=100%` 반복 게이트를 포함해, 전 usecase 기본 원칙을 Plan UI에 노출합니다.
 - 활성화 이후에는 다음 동작이 있을 때 setup plan이 즉시 재발행되어 Progress가 갱신됩니다.
   - config 변경: `SetMode`, `SetModel`, `SetSessionConfigOption`
   - 검증 명령 실행: `/status`, `/monitor`, `/vector`

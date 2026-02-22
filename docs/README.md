@@ -19,6 +19,8 @@
 - [release_notes_v0.9.10.md](releases/release_notes_v0.9.10.md)
 - [release_notes_v0.9.11.md](releases/release_notes_v0.9.11.md)
 - [release_notes_v0.9.12.md](releases/release_notes_v0.9.12.md)
+- [release_notes_v0.9.13.md](releases/release_notes_v0.9.13.md)
+- [release_notes_v0.9.14.md](releases/release_notes_v0.9.14.md)
 
 ## quality/
 - [qa_checklist.md](quality/qa_checklist.md): QA 체크리스트

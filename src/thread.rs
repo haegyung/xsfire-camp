@@ -958,9 +958,24 @@ enum OneShotKind {
     Skills,
 }
 
+#[derive(Clone, Debug, Default)]
+struct SkillsCommandOptions {
+    force_reload: bool,
+    enabled: Option<bool>,
+    scope: Option<String>,
+    query: Option<String>,
+}
+
+impl SkillsCommandOptions {
+    fn has_filters(&self) -> bool {
+        self.enabled.is_some() || self.scope.is_some() || self.query.is_some()
+    }
+}
+
 struct OneShotCommandState {
     kind: OneShotKind,
     response_tx: Option<oneshot::Sender<Result<StopReason, Error>>>,
+    skills_options: SkillsCommandOptions,
 }
 
 impl OneShotCommandState {
@@ -968,6 +983,18 @@ impl OneShotCommandState {
         Self {
             kind,
             response_tx: Some(response_tx),
+            skills_options: SkillsCommandOptions::default(),
+        }
+    }
+
+    fn new_skills(
+        response_tx: oneshot::Sender<Result<StopReason, Error>>,
+        skills_options: SkillsCommandOptions,
+    ) -> Self {
+        Self {
+            kind: OneShotKind::Skills,
+            response_tx: Some(response_tx),
+            skills_options,
         }
     }
 
@@ -989,7 +1016,9 @@ impl OneShotCommandState {
                 }
             }
             (OneShotKind::Skills, EventMsg::ListSkillsResponse(event)) => {
-                client.send_agent_text(format_skills_message(&event)).await;
+                client
+                    .send_agent_text(format_skills_message(&event, &self.skills_options))
+                    .await;
                 if let Some(tx) = self.response_tx.take() {
                     drop(tx.send(Ok(StopReason::EndTurn)));
                 }
@@ -2517,7 +2546,12 @@ impl<A: Auth> ThreadActor<A> {
             AvailableCommand::new(
                 "skills",
                 "use skills to improve how Codex performs specific tasks",
-            ),
+            )
+            .input(AvailableCommandInput::Unstructured(
+                UnstructuredCommandInput::new(
+                    "optional: --enabled | --disabled | --scope <scope> | --reload | <keyword>",
+                ),
+            )),
             AvailableCommand::new("mcp", "list configured MCP tools"),
             AvailableCommand::new("status", "show current session configuration"),
             AvailableCommand::new(
@@ -3342,6 +3376,17 @@ impl<A: Auth> ThreadActor<A> {
         lines.push("xsfire-camp setup wizard".to_string());
         lines.push("(See the Plan panel for the step-by-step checklist.)".to_string());
         lines.push(String::new());
+        lines.push("0) Default execution protocol (all use cases)".to_string());
+        lines.push("- Lock Goal (one sentence with verifiable done criteria).".to_string());
+        lines.push("- Define Rubric: Must (with evidence) / Should (quality).".to_string());
+        lines.push(
+            "- Iterate in order: Research -> Plan -> Implement -> Verify -> Score.".to_string(),
+        );
+        lines.push(
+            "- Keep iterating until Must reaches 100% and keep Plan UI updated each iteration."
+                .to_string(),
+        );
+        lines.push(String::new());
         lines.push("1) Authentication".to_string());
         lines.push(
             "- In most ACP clients (e.g., Zed), authentication happens via the client UI when the agent reports `auth_required`."
@@ -3411,6 +3456,21 @@ impl<A: Auth> ThreadActor<A> {
 
     fn setup_wizard_plan_items(&self) -> Vec<PlanItemArg> {
         let mut items = Vec::new();
+
+        items.push(PlanItemArg {
+            step: "Protocol: Goal -> Rubric(Must/Should+Evidence) locked".to_string(),
+            status: StepStatus::Completed,
+        });
+
+        items.push(PlanItemArg {
+            step: format!(
+                "Loop gate: iterate Research -> Plan -> Implement -> Verify -> Score until Must=100% ({}/{}, {}%)",
+                self.setup_wizard_progress.completed_count(),
+                SetupWizardProgressState::TOTAL_VERIFICATION_STEPS,
+                self.setup_wizard_progress.progress_percent()
+            ),
+            status: self.setup_wizard_progress.verification_status(),
+        });
 
         // Authentication: if the session exists, the driver already passed `check_auth()` for
         // providers that require it. Mark this as completed to keep the wizard actionable.
@@ -3866,6 +3926,7 @@ impl<A: Auth> ThreadActor<A> {
 
         let items = build_prompt_items(request.prompt);
         let op;
+        let mut skills_options = SkillsCommandOptions::default();
         if let Some((name, rest)) = extract_slash_command(&items) {
             self.flow_vector
                 .record_phase('C', format!("slash command: /{name}"));
@@ -4028,9 +4089,21 @@ impl<A: Auth> ThreadActor<A> {
                 }
                 "mcp" => op = Op::ListMcpTools,
                 "skills" => {
+                    let parsed = match parse_skills_command_options(rest) {
+                        Ok(parsed) => parsed,
+                        Err(error_message) => {
+                            self.client
+                                .send_agent_text(skills_command_usage_message(Some(&error_message)))
+                                .await;
+                            drop(response_tx.send(Ok(StopReason::EndTurn)));
+                            return Ok(response_rx);
+                        }
+                    };
+                    let force_reload = parsed.force_reload;
+                    skills_options = parsed;
                     op = Op::ListSkills {
                         cwds: vec![],
-                        force_reload: false,
+                        force_reload,
                     }
                 }
                 "diff" => {
@@ -4182,9 +4255,10 @@ impl<A: Auth> ThreadActor<A> {
                 OneShotKind::McpTools,
                 response_tx,
             )),
-            Op::ListSkills { .. } => {
-                SubmissionState::OneShot(OneShotCommandState::new(OneShotKind::Skills, response_tx))
-            }
+            Op::ListSkills { .. } => SubmissionState::OneShot(OneShotCommandState::new_skills(
+                response_tx,
+                skills_options,
+            )),
             _ => SubmissionState::Prompt(PromptState::new(
                 self.thread.clone(),
                 response_tx,
@@ -5287,20 +5361,150 @@ fn format_mcp_tools_message(event: &codex_core::protocol::McpListToolsResponseEv
     lines.join("\n")
 }
 
-fn format_skills_message(event: &codex_core::protocol::ListSkillsResponseEvent) -> String {
+fn skills_command_usage_message(error: Option<&str>) -> String {
+    let mut lines = Vec::new();
+
+    if let Some(error) = error {
+        lines.push(format!("Invalid /skills option: {error}"));
+        lines.push(String::new());
+    }
+
+    lines.push("Usage:".to_string());
+    lines.push("- /skills".to_string());
+    lines.push("- /skills --enabled".to_string());
+    lines.push("- /skills --disabled".to_string());
+    lines.push("- /skills --scope <scope>".to_string());
+    lines.push("- /skills --reload".to_string());
+    lines.push("- /skills <keyword>".to_string());
+    lines.push(String::new());
+    lines.push("Examples:".to_string());
+    lines.push("- /skills --scope repo".to_string());
+    lines.push("- /skills --enabled review".to_string());
+
+    lines.join("\n")
+}
+
+fn parse_skills_command_options(rest: &str) -> Result<SkillsCommandOptions, String> {
+    let mut options = SkillsCommandOptions::default();
+    let mut tokens = rest.split_whitespace().peekable();
+    let mut query_parts = Vec::new();
+
+    while let Some(token) = tokens.next() {
+        match token {
+            "--reload" | "reload" => {
+                options.force_reload = true;
+            }
+            "--enabled" | "enabled" => {
+                if options.enabled == Some(false) {
+                    return Err("cannot combine --enabled and --disabled".to_string());
+                }
+                options.enabled = Some(true);
+            }
+            "--disabled" | "disabled" => {
+                if options.enabled == Some(true) {
+                    return Err("cannot combine --enabled and --disabled".to_string());
+                }
+                options.enabled = Some(false);
+            }
+            "--scope" => {
+                let Some(scope) = tokens.next() else {
+                    return Err("expected a value after --scope".to_string());
+                };
+                if scope.starts_with("--") {
+                    return Err("expected a scope value after --scope".to_string());
+                }
+                options.scope = Some(scope.to_ascii_lowercase());
+            }
+            _ if token.starts_with("--scope=") => {
+                let scope = token.trim_start_matches("--scope=").trim();
+                if scope.is_empty() {
+                    return Err("expected a value in --scope=<value>".to_string());
+                }
+                options.scope = Some(scope.to_ascii_lowercase());
+            }
+            _ if token.starts_with("--") => {
+                return Err(format!("unknown option `{token}`"));
+            }
+            _ => {
+                query_parts.push(token.to_string());
+                query_parts.extend(tokens.map(ToString::to_string));
+                break;
+            }
+        }
+    }
+
+    if !query_parts.is_empty() {
+        options.query = Some(query_parts.join(" ").to_ascii_lowercase());
+    }
+
+    Ok(options)
+}
+
+fn format_skills_message(
+    event: &codex_core::protocol::ListSkillsResponseEvent,
+    options: &SkillsCommandOptions,
+) -> String {
     let mut lines = Vec::new();
     if event.skills.is_empty() {
-        return "No skills found.".to_string();
+        lines.push("No skills found.".to_string());
+        lines.push(String::new());
+        lines.push(skills_command_usage_message(None));
+        return lines.join("\n");
     }
+
+    if options.force_reload || options.has_filters() {
+        let enabled = match options.enabled {
+            Some(true) => "enabled only",
+            Some(false) => "disabled only",
+            None => "all",
+        };
+        let scope = options.scope.as_deref().unwrap_or("all");
+        let query = options.query.as_deref().unwrap_or("(none)");
+        lines.push(format!(
+            "Applied filters: enabled={enabled}, scope={scope}, query={query}, reload={}",
+            options.force_reload
+        ));
+        lines.push(String::new());
+    }
+
+    let mut matched_any = false;
 
     for entry in &event.skills {
         lines.push(format!("Skills for {}:", entry.cwd.display()));
         let mut skills = entry.skills.clone();
         skills.sort_by(|a, b| a.name.cmp(&b.name));
+        skills.retain(|skill| {
+            if let Some(enabled) = options.enabled
+                && skill.enabled != enabled
+            {
+                return false;
+            }
+
+            let scope_name = format!("{:?}", skill.scope).to_ascii_lowercase();
+            if let Some(scope) = options.scope.as_deref()
+                && scope_name != scope
+            {
+                return false;
+            }
+
+            if let Some(query) = options.query.as_deref() {
+                let name = skill.name.to_ascii_lowercase();
+                let description = skill.description.to_ascii_lowercase();
+                if !name.contains(query)
+                    && !description.contains(query)
+                    && !scope_name.contains(query)
+                {
+                    return false;
+                }
+            }
+
+            true
+        });
 
         if skills.is_empty() {
             lines.push("- (none)".to_string());
         } else {
+            matched_any = true;
             for skill in skills {
                 let enabled = if skill.enabled { "enabled" } else { "disabled" };
                 lines.push(format!(
@@ -5319,6 +5523,17 @@ fn format_skills_message(event: &codex_core::protocol::ListSkillsResponseEvent) 
 
         lines.push(String::new());
     }
+
+    if options.has_filters() && !matched_any {
+        lines.push("No skills matched the current filters.".to_string());
+        lines.push(String::new());
+    }
+
+    lines.push("Available /skills options:".to_string());
+    lines.push("- --enabled | --disabled".to_string());
+    lines.push("- --scope <scope>".to_string());
+    lines.push("- --reload".to_string());
+    lines.push("- <keyword>".to_string());
 
     // Remove trailing blank line for cleaner display
     while lines.last().is_some_and(|l| l.is_empty()) {
@@ -6267,6 +6482,7 @@ mod tests {
             .map(|entry| entry.content.as_str())
             .collect::<Vec<_>>();
         for expected in [
+            "Protocol: Goal -> Rubric(Must/Should+Evidence) locked",
             "Setup: authentication",
             "Setup: choose model",
             "Setup: choose reasoning effort",
@@ -6281,6 +6497,14 @@ mod tests {
                 "expected plan to include step {expected:?}. steps={steps:?}"
             );
         }
+        assert!(
+            steps.iter().any(|entry| {
+                entry.starts_with(
+                    "Loop gate: iterate Research -> Plan -> Implement -> Verify -> Score until Must=100% (",
+                )
+            }),
+            "expected plan to include rubric loop gate step. steps={steps:?}"
+        );
         assert!(
             steps
                 .iter()
@@ -6828,7 +7052,7 @@ mod tests {
                 SessionUpdate::AgentMessageChunk(ContentChunk {
                     content: ContentBlock::Text(TextContent { text, .. }),
                     ..
-                }) if text.contains("demo-skill")
+                }) if text.contains("demo-skill") && text.contains("--enabled")
             ),
             "notifications don't match {notifications:?}"
         );
@@ -6840,6 +7064,147 @@ mod tests {
                 cwds: vec![],
                 force_reload: false,
             }]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skills_with_reload_option() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/skills --reload".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(
+                &notifications[0].update,
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("reload=true")
+            ),
+            "notifications don't match {notifications:?}"
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert_eq!(
+            ops.as_slice(),
+            &[Op::ListSkills {
+                cwds: vec![],
+                force_reload: true,
+            }]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skills_with_enabled_filter_option() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/skills --enabled".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(
+                &notifications[0].update,
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("enabled=enabled only")
+            ),
+            "notifications don't match {notifications:?}"
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert_eq!(
+            ops.as_slice(),
+            &[Op::ListSkills {
+                cwds: vec![],
+                force_reload: false,
+            }]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skills_with_invalid_option_returns_usage_without_submit() -> anyhow::Result<()> {
+        let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/skills --invalid".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(
+                &notifications[0].update,
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("Invalid /skills option") && text.contains("Usage:")
+            ),
+            "notifications don't match {notifications:?}"
+        );
+
+        let ops = thread.ops.lock().unwrap();
+        assert!(
+            ops.is_empty(),
+            "no op should be submitted for invalid /skills options, got {ops:?}"
         );
 
         Ok(())

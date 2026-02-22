@@ -60,3 +60,19 @@ But you might disable/avoid it if:
 
 You can point it at a controlled location with `ACP_HOME`.
 
+## 6. Default Execution Protocol Policy (All Use Cases)
+
+When using `xsfire-camp`, the default operating protocol is rubric-driven iteration:
+
+- Lock a one-sentence `Goal` with verifiable completion criteria.
+- Define a `Rubric` split into `Must` and `Should`.
+- Every `Must` item must include evidence (file path, command result, or primary source).
+- Execute in sequence:
+  `Research -> Plan -> Implement -> Verify -> Score`.
+- Keep iterating until `Must` reaches 100%.
+- Keep Plan UI updated every iteration until the rubric is fully satisfied.
+
+Practical default in this repository:
+
+- Start with `/setup` so the Plan panel exposes protocol and verification progress.
+- Use `/status`, `/monitor`, and `/vector` to keep execution/verification state visible.
