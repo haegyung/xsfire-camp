@@ -267,11 +267,12 @@ jobs:
         if: steps.publish_config.outputs.enabled == '1'
         uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
+          node-version: "20"
           registry-url: "https://registry.npmjs.org"
+          scope: ${{ env.NPM_PUBLISH_OIDC_SCOPE }}
       - name: Update npm
         if: steps.publish_config.outputs.enabled == '1'
-        run: npm install -g npm@latest
+        run: npm install -g npm@10
 
       - name: Download NPM packages
         if: steps.publish_config.outputs.enabled == '1'
@@ -298,15 +299,17 @@ jobs:
           esac
 
           if [ -n "${NPM_TOKEN:-}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG}"
+            {
+              echo "registry=https://registry.npmjs.org/"
+              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+              echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}"
+            } > "${NPM_CONFIG_USERCONFIG}"
             echo "Using NPM_TOKEN for authentication."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=0
           elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
-            {
-              echo "registry=https://registry.npmjs.org/"
-              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-            } > "${NPM_CONFIG_USERCONFIG}"
+            npm config set --location=user registry https://registry.npmjs.org/
+            npm config set --location=user "${NPM_PUBLISH_OIDC_SCOPE}:registry" https://registry.npmjs.org/
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
@@ -391,11 +394,12 @@ jobs:
         if: steps.publish_config.outputs.enabled == '1'
         uses: actions/setup-node@v6
         with:
-          node-version: "lts/*"
+          node-version: "20"
           registry-url: "https://registry.npmjs.org"
+          scope: ${{ env.NPM_PUBLISH_OIDC_SCOPE }}
       - name: Update npm
         if: steps.publish_config.outputs.enabled == '1'
-        run: npm install -g npm@latest
+        run: npm install -g npm@10
 
       - name: Download base package
         if: steps.publish_config.outputs.enabled == '1'
@@ -426,7 +430,11 @@ jobs:
           esac
 
           if [ -n "${NPM_TOKEN:-}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG}"
+            {
+              echo "registry=https://registry.npmjs.org/"
+              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+              echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}"
+            } > "${NPM_CONFIG_USERCONFIG}"
             echo "Using NPM_TOKEN for authentication."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=0
@@ -438,10 +446,8 @@ jobs:
               exit 1
             fi
           elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
-            {
-              echo "registry=https://registry.npmjs.org/"
-              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-            } > "${NPM_CONFIG_USERCONFIG}"
+            npm config set --location=user registry https://registry.npmjs.org/
+            npm config set --location=user "${NPM_PUBLISH_OIDC_SCOPE}:registry" https://registry.npmjs.org/
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
