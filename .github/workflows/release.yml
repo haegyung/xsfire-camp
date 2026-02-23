@@ -268,6 +268,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          scope: ${{ env.NPM_PUBLISH_OIDC_SCOPE }}
       - name: Update npm
         if: steps.publish_config.outputs.enabled == '1'
         run: npm install -g npm@10
@@ -286,7 +288,6 @@ jobs:
           NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
           NPM_CONFIG_USERCONFIG="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          unset NODE_AUTH_TOKEN
 
           # If NPM_TOKEN is not set, we fall back to npm "trusted publishing" (OIDC) via --provenance.
           # If neither is configured, npm will fail with ENEEDAUTH.
@@ -307,10 +308,25 @@ jobs:
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=0
           elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
-            {
-              echo "registry=https://registry.npmjs.org/"
-              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-            } > "${NPM_CONFIG_USERCONFIG}"
+            if [ -f "${NPM_CONFIG_USERCONFIG}" ]; then
+              if ! grep -Eq "^registry=" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+              if ! grep -Fq "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+              if [ -n "${NODE_AUTH_TOKEN:-}" ] && ! grep -Fq "//registry.npmjs.org/:_authToken=" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+            else
+              {
+                echo "registry=https://registry.npmjs.org/"
+                echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+                if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+                  echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}"
+                fi
+              } > "${NPM_CONFIG_USERCONFIG}"
+            fi
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
@@ -396,6 +412,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          scope: ${{ env.NPM_PUBLISH_OIDC_SCOPE }}
       - name: Update npm
         if: steps.publish_config.outputs.enabled == '1'
         run: npm install -g npm@10
@@ -420,7 +438,6 @@ jobs:
           NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
           NPM_CONFIG_USERCONFIG="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          unset NODE_AUTH_TOKEN
 
           NPM_OIDC_PUBLISH_ENABLED=0
           case "${NPM_OIDC_PUBLISH,,}" in
@@ -446,10 +463,25 @@ jobs:
               exit 1
             fi
           elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
-            {
-              echo "registry=https://registry.npmjs.org/"
-              echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-            } > "${NPM_CONFIG_USERCONFIG}"
+            if [ -f "${NPM_CONFIG_USERCONFIG}" ]; then
+              if ! grep -Eq "^registry=" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+              if ! grep -Fq "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+              if [ -n "${NODE_AUTH_TOKEN:-}" ] && ! grep -Fq "//registry.npmjs.org/:_authToken=" "${NPM_CONFIG_USERCONFIG}"; then
+                echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" >> "${NPM_CONFIG_USERCONFIG}"
+              fi
+            else
+              {
+                echo "registry=https://registry.npmjs.org/"
+                echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+                if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+                  echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}"
+                fi
+              } > "${NPM_CONFIG_USERCONFIG}"
+            fi
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
