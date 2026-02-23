@@ -1,183 +1,85 @@
 # xsfire-camp
 
-에디터가 바뀌어도 작업을 이어가고, AI가 실행한 명령과 수정 내역을 승인까지 포함해 깔끔하게 남깁니다.
+ACP(Agent Client Protocol) 클라이언트에서 Codex CLI를 실행형 에이전트로 연결하는 브리지입니다.
 
-ACP 표준으로 Codex CLI를 IDE에 연결해, 작업 세션을 Tool call/Plan/승인 로그로 구조화해 보여줍니다.
+`xsfire-camp` lets ACP-compatible clients (for example Zed) run Codex CLI as an execution-first agent session.
 
-Use [Codex](https://github.com/openai/codex) from [ACP-compatible](https://agentclientprotocol.com) clients such as [Zed](https://zed.dev)!
-
-This fork aligns ACP session metadata with Codex CLI, so Zed ACP threads share the same
-session source as CLI sessions while preserving ACP behavior.
-
-Learn more about the [Agent Client Protocol](https://agentclientprotocol.com/).
-
-Language: [한국어](#총정리-kr) | [English](#overview-en)
+- ACP: https://agentclientprotocol.com/
+- Codex: https://github.com/openai/codex
+- Project purpose: keep session continuity across IDE and CLI with structured logs and approval flow
 
 ## Quick Start (60 sec)
 
-### KR
-1. 빌드: `cargo build --release`
-2. 실행: `OPENAI_API_KEY=... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp`
-3. 멀티 백엔드: `target/release/xsfire-camp --backend=multi`
-4. 검증: `cargo test` / `node npm/testing/test-platform-detection.js`
-
-### EN
-1. Build: `cargo build --release`
-2. Run: `OPENAI_API_KEY=... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp`
-3. Multi backend mode: `target/release/xsfire-camp --backend=multi`
-4. Verify: `cargo test` / `node npm/testing/test-platform-detection.js`
-
-## 총정리 (KR)
-
-`xsfire-camp`는 **Codex CLI(codex-rs)** 를 **ACP(Agent Client Protocol)** 에이전트로 감싸, Zed/VS Code(ACP 확장) 같은 ACP 클라이언트에서 Codex를 “대화”가 아니라 **작업 실행이 포함된 세션**으로 운용하게 해줍니다.
-핵심 가치는 **CLI 세션과 ACP 세션이 동일한 `CODEX_HOME` 저장소/메타데이터를 공유**하도록 맞춰, 클라이언트가 달라도 작업 흐름이 끊기지 않는다는 점입니다.
-
-### theprometheus / Augmented Technology 관점
-
-- 이 프로젝트는 `theprometheus`의 **Augmented Technology** 관점에서, AI를 “대체 지능”이 아니라 **증강(보강) 지능**으로 다룹니다.
-- 목표는 자동화 자체보다, 사람이 더 잘 판단하고 더 안전하게 실행하고 더 정확히 복기할 수 있는 작업 환경을 만드는 것입니다.
-- 설계 우선순위는 다음과 같습니다.
-  - 세션 연속성: IDE/CLI를 넘나들어도 작업 맥락이 유지될 것
-  - 행동 가시성: Tool call/Plan/승인/모니터링 흐름이 구조적으로 남을 것
-  - 인간 통제권: 승인(Approvals)과 정책을 통해 위험 동작을 통제할 것
-
-### 가지고 있는 기능
-
-- ACP 표준 I/O(stdio)로 동작하는 Codex 에이전트
-- 세션 저장소 공유: ACP `session_id`를 Codex thread id와 동일하게 사용하고, 세션 소스를 CLI와 맞춰 동일한 세션 저장소(`CODEX_HOME`)를 사용
-- 글로벌 세션 저장소(기본 활성): backend-native 로그는 분리한 채, `ACP_HOME`(기본 `~/.acp`)에 canonical 작업 로그(JSONL)를 추가로 남겨 “모델/클라이언트가 바뀌어도” 맥락을 이어가기 쉽게 함 (`docs/backend/session_store.md`)
-- Embedded context / @-mentions, 이미지 입력 지원(클라이언트가 제공할 때)
-- Tool calls(쉘 실행, apply_patch, 웹 검색, MCP tool call 등) 스트리밍 및 결과 업데이트
-- 승인(Approvals) 플로우: 실행/패치 등 위험 동작을 `RequestPermission`으로 노출하고 사용자 선택을 반영
-- Plan/TODO/Terminal 등 “작업 진행” 신호를 ACP `SessionUpdate`로 전달
-- 기본 실행 프로토콜(전 usecase 권장 기본값): `Goal 고정 -> Rubric(Must/Should+Evidence) -> Research -> Plan -> Implement -> Verify -> Score`를 반복하고, `Must` 100%까지 Plan UI를 계속 갱신
-- Codex CLI parity 중심의 slash commands 지원: `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status`, `/sessions`, `/load`, `/mcp`, `/skills` 등 (TIP: `/setup`은 Plan 패널에 체크리스트를 표시합니다)
-- `/skills` 옵션: `--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>` 지원(결과 하단에 사용 예시 출력)
-- 모니터링/UX 보조: `/monitor`(플랜/컨텍스트 사용량/트레이스), `/monitor retro`(회고형 리포트), `/vector`(워크플로 방향 미니맵/나침반), `/new-window`(새 스레드 안내), `/experimental`(베타 기능 토글 안내)
-- Custom prompts: 저장된 prompt를 `/name KEY=value` 형태로 호출, `$1..$9`, `$ARGUMENTS` 및 named placeholder 지원
-- MCP 서버 병합: ACP 클라이언트가 제공한 MCP 서버(HTTP/stdio)를 codex-rs 설정에 병합
-
-### Slash Command Snapshot
-
-| Category | Commands |
-| --- | --- |
-| Core | `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status` |
-| Session | `/sessions`, `/load` |
-| Integrations | `/mcp`, `/skills` (`--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>`) |
-| Monitoring | `/monitor`, `/monitor retro`, `/vector`, `/experimental` |
-| UX | `/new-window` |
-
-### 효과 (왜 유용한가)
-
-- **클라이언트 독립성**: Zed 등 ACP 클라이언트가 바뀌어도 에이전트(이 바이너리)를 고정하면 워크플로가 안정적입니다.
-- **세션 연속성**: IDE(ACP)에서 시작한 작업을 CLI에서 이어가거나, 반대로도 가능합니다(같은 `CODEX_HOME`을 쓸 때).
-- **(지향) 모델/백엔드 연속성**: backend별 고유 기능은 유지하면서도, canonical 로그로 “작업 타임라인”을 통일해 LLM이 바뀌어도 맥락을 이어가기 쉬운 구조를 목표로 합니다.
-- **추적 가능성**: Tool call/Plan/Terminal 같은 “행동”이 구조화되어 남아, 무엇을 했는지 검토/공유가 쉽습니다.
-- **안전한 자동화**: 승인 단계를 통해 파괴적 명령이나 패치 적용을 통제하기 좋습니다.
-- **재사용 가능한 협업 자산화**: Custom prompts를 템플릿화해 개발/창작 루틴(리뷰, 문서화, 교정, 요약 등)을 반복 실행 가능한 “도구”로 만들 수 있습니다.
-
-### 방향성 (지향점)
-
-- Codex CLI의 주요 워크플로를 ACP에서 **동등한 경험(parity)** 으로 제공
-- ACP 클라이언트별 차이는 “어댑터 내부에서 흡수”하고, 사용자 입장에서는 동일한 세션/권한/툴콜 모델로 사용
-- 안전성 우선: sandbox/approval 모델을 명확히 하고, 변경 가능한 영역(세션 루트 등)을 좁게 유지
-- 문서와 테스트를 통해 “작동 방식”이 재현 가능하게 유지(특히 slash command/tool call/approval 스트리밍)
-
-### 로드맵 (요약)
-
-- 지금: backend driver(드라이버) 경계를 유지하면서 `--backend=multi`를 통해 Codex/Claude/Gemini를 한 프로세스에서 라우팅할 수 있습니다. 스레드 안에서 `/backend <codex|claude-code|gemini>`로 전환 가능합니다.
-- 다음: 각 백엔드의 툴콜/승인/파일수정 “고유 기능”을 최대한 보존하고, backend 간 세션/컨텍스트 동기화를 더 정교하게 만듭니다.
-- 나중: canonical 로그 스키마/상관관계 ID/보안(레닥션) 정책을 강화해 “모델이 바뀌어도” 작업 맥락을 더 안정적으로 이어가게 합니다.
-
-자세한 계획: `docs/plans/roadmap.md`, `docs/backend/backends.md`, `docs/backend/session_store.md`, `docs/backend/policies.md`.
-문서 인덱스: `docs/README.md`.
-
-### 이용 케이스
-
-개발 업무:
-
-- 코드 변경 후 `/review`로 이슈 탐지 및 개선 루프 반복
-- `/review-branch <branch>` 또는 `/review-commit <sha>`로 비교 기반 리뷰
-- `/diff`로 변경사항 확인(백엔드/클라이언트 환경에 따라 지원 범위가 다를 수 있음)
-- 긴 대화/작업 후 `/compact`로 컨텍스트 압축, 필요시 `/undo`로 최근 턴 되돌리기
-- MCP 도구(사내 API, 문서 검색, 티켓 시스템 등)를 붙여 “리서치/실행/정리”를 한 세션에서 처리
-
-창작/기획/문서 작업:
-
-- Custom prompt로 “톤/형식/검수” 템플릿을 표준화: 예) `/rewrite STYLE=formal AUDIENCE=devs`
-- Plan/TODO/툴콜 결과를 기반으로 초안 → 편집 → 검수 과정을 단계화
-- MCP로 외부 자료 정리/요약 파이프라인을 연결해 반복 작업을 자동화
-
-팀 운영:
-
-- 승인 프리셋(Approval Preset) 기반으로 “무엇을 자동으로 허용할지” 팀 기준을 맞춤
-- `CODEX_HOME`을 통일해 세션/설정/인증 상태를 팀 내 운영 가이드로 고정
-
-## 사용 방법 (KR)
-
-### 요구 사항
-
-- Rust toolchain(빌드 시)
-- ACP 클라이언트(예: Zed) 또는 ACP를 실행할 수 있는 클라이언트
-- 인증: `OPENAI_API_KEY` 또는 `CODEX_API_KEY` 또는 ChatGPT subscription(환경에 따라)
-- 동일한 사용자 계정에서 `CODEX_HOME`을 공유하는 것을 권장
-- 글로벌 canonical 로그(기본 활성): `ACP_HOME` (기본 `~/.acp`) 및 정책은 `docs/backend/session_store.md`, `docs/backend/policies.md` 참고
-
-### 설정/인증 요약 (KR)
-
-| Type | Key / Method | Required | Notes |
-| --- | --- | --- | --- |
-| Env | `OPENAI_API_KEY` | Optional | Codex API 인증 방식 중 하나 |
-| Env | `CODEX_API_KEY` | Optional | Codex API 인증 방식 중 하나 |
-| Env | `CODEX_HOME` | Recommended | 세션/메타데이터 공유 경로 |
-| Env | `ACP_HOME` | Optional | canonical 로그 저장 경로 (기본 `~/.acp`) |
-| Method ID | `chatgpt` / `codex-api-key` / `openai-api-key` | Depends | Codex backend로 라우팅 |
-| Method ID | `claude-cli` / `gemini-cli` | Depends | 해당 CLI backend로 라우팅 |
-| Backend override | `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`, `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE` | Optional | CLI 경로/인자/승인 모드 오버라이드 |
-
-### 설치/실행 (바이너리)
-
-빌드:
-
-```
+1. Build
+```bash
 cargo build --release
 ```
 
-바이너리 경로:
-
-```
-target/release/xsfire-camp
-```
-
-실행(ACP stdio 에이전트로 동작):
-
-```
-OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
+2. Run
+```bash
+OPENAI_API_KEY=... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
 ```
 
-백엔드 선택(기본값: `codex`):
-
+3. Optional: multi-backend mode
+```bash
+target/release/xsfire-camp --backend=multi
 ```
+
+4. Verify
+```bash
+cargo test
+node npm/testing/test-platform-detection.js
+```
+
+## Who This Is For
+
+- ACP client users who want stable Codex behavior independent of client adapter changes
+- Teams that need traceable tool/plan/approval logs for review and safety
+- Operators who want to preserve context across terminal and IDE sessions
+
+## Prerequisites
+
+| Item | Required | Notes |
+| --- | --- | --- |
+| Rust toolchain | Yes (build from source) | For `cargo build --release` |
+| ACP client (example: Zed) | Yes | Must support stdio ACP agent |
+| Auth (`OPENAI_API_KEY` or `CODEX_API_KEY`) | Yes (Codex backend) | Depends on backend/auth route |
+| `CODEX_HOME` | Recommended | Session/thread continuity root |
+| `ACP_HOME` | Optional | Canonical ACP log root (default `~/.acp`) |
+
+## Run Modes
+
+```bash
 target/release/xsfire-camp --backend=codex
 target/release/xsfire-camp --backend=claude-code
 target/release/xsfire-camp --backend=gemini
 target/release/xsfire-camp --backend=multi
 ```
 
-참고:
+Notes:
+- `claude-code` and `gemini` backends require their CLIs to be installed and authenticated.
+- In `multi` mode, switch backend in-thread: `/backend codex|claude-code|gemini`.
+- Backend-specific overrides:
+  - `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`
+  - `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE`
 
-- `claude-code`/`gemini` 백엔드는 현재 최소 구현(원샷 프롬프트 위주)입니다. `claude`/`gemini` CLI가 설치되어 있고, CLI 자체에서 인증이 완료되어 있어야 합니다.
-- 필요하면 실행 바이너리/추가 플래그를 env로 오버라이드할 수 있습니다: `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`, `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE`.
-- `--backend=multi`에서는 스레드 안에서 `/backend codex`, `/backend claude-code`, `/backend gemini`로 전환할 수 있습니다.
-- 인증은 `authenticate` method id 기준으로 라우팅됩니다. `chatgpt`/`codex-api-key`/`openai-api-key`는 Codex로, `claude-cli`/`gemini-cli`는 각 CLI 백엔드로 전달됩니다.
+## Common Commands Snapshot
 
-### Zed (custom agent registration)
+| Category | Commands |
+| --- | --- |
+| Core | `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status` |
+| Session | `/sessions`, `/load` |
+| Integrations | `/mcp`, `/skills` |
+| Monitoring | `/monitor`, `/monitor retro`, `/vector`, `/experimental` |
+| UX | `/new-window` |
 
-Zed에 custom ACP agent로 등록하면, Zed 내장 Codex 어댑터 변화와 무관하게 설정을 고정할 수 있습니다.
+## Client Integration
 
-`settings.json` 예시(경로는 환경에 맞게):
+### Zed custom agent registration
 
-```
+`settings.json` example:
+
+```json
 {
   "agent_servers": {
     "xsfire-camp": {
@@ -191,191 +93,105 @@ Zed에 custom ACP agent로 등록하면, Zed 내장 Codex 어댑터 변화와 �
 }
 ```
 
-Agent Panel에서 "xsfire-camp"로 새 스레드를 시작합니다.
+### VS Code notes
 
-### VS Code
+This repository does not ship a VS Code ACP extension. Use a VS Code ACP client extension that can run a stdio custom agent.
 
-이 레포는 VS Code 확장(ACP 클라이언트)을 포함하지 않습니다.
-VS Code에서 사용하려면 “ACP 클라이언트 역할”을 하는 확장/플러그인이 별도로 필요하며, 해당 확장이 stdio 기반 커스텀 에이전트를 실행할 수 있어야 합니다.
+Compatibility note:
 
-커뮤니티 “VSCode ACP” 확장을 사용하는 경우, 에이전트를 `<command> acp` 형태로 실행하는 구현이 있을 수 있습니다.
-이 바이너리는 `acp`/`--acp` 인자를 받아도 동일하게 ACP 에이전트로 동작하도록 호환되어 있으므로 아래 형태로도 실행될 수 있습니다:
-
-```
+```bash
 xsfire-camp acp
 ```
 
-VS Code 확장이 PATH에서 에이전트를 찾는 방식이라면, 다음 중 하나로 `xsfire-camp` 커맨드를 PATH에 노출하세요.
+If the extension resolves agents from PATH, expose command via npm:
 
-```
+```bash
 npm i -g @haegyung/xsfire-camp
 ```
 
-또는 직접 빌드한 바이너리를 PATH에 두고 실행해도 됩니다.
+## npm Package
 
-확장에서 환경변수 주입을 지원하지 않는 경우, VS Code를 환경변수와 함께 실행하는 방식이 가장 확실합니다:
-
-```
-CODEX_HOME="$HOME/.codex" OPENAI_API_KEY=sk-... code .
-```
-
-### npm으로 실행
-
-```
+```bash
 npx @haegyung/xsfire-camp
 ```
 
-## 기술 메모 (KR)
+Package:
+- Base: `@haegyung/xsfire-camp`
+- Platform optional dependencies:
+  - `@haegyung/xsfire-camp-darwin-arm64`
+  - `@haegyung/xsfire-camp-darwin-x64`
+  - `@haegyung/xsfire-camp-linux-arm64`
+  - `@haegyung/xsfire-camp-linux-x64`
+  - `@haegyung/xsfire-camp-win32-arm64`
+  - `@haegyung/xsfire-camp-win32-x64`
 
-- ACP는 stdio로 연결됩니다. 이 바이너리는 ACP 메시지를 codex-rs의 thread/session 실행으로 브릿지하고, 결과를 `SessionUpdate`로 스트리밍합니다.
-- 세션 저장소 공유를 위해 ACP `session_id`는 Codex thread id와 동일하게 취급합니다. 또한 세션 소스를 CLI로 맞춰 동일한 메타데이터 저장소(`CODEX_HOME/threads`, `CODEX_HOME/rollouts`)를 공유합니다.
-- `new_session`/`load_session` 시 `cwd`(세션 루트)를 기록하고, 파일 접근은 기본적으로 이 루트 밖 경로를 차단합니다.
-- 일부 CLI 커맨드는 인터랙티브 메뉴를 전제로 하므로 ACP에서 안내 메시지로 대체될 수 있습니다.
-- 세션/스레드 전환은 ACP 클라이언트가 주도해야 합니다(`/load`는 전환 방법을 안내).
+## Troubleshooting (Top 5)
 
-참고:
+1. Auth error on startup
+- Check `OPENAI_API_KEY` or `CODEX_API_KEY` is set for Codex backend.
 
-- ACP 표준/기능 매핑: `docs/reference/acp_standard_spec.md`
-- `CODEX_HOME` 구조/권한: `docs/reference/codex_home_overview.md`
-- 이벤트 -> ACP 출력 매핑: `docs/reference/event_handling.md`
-- 로컬 검증 가이드: `docs/quality/verification_guidance.md`
+2. Sessions not shared between CLI and ACP client
+- Ensure both run with the same `CODEX_HOME`.
 
-## Overview (EN)
+3. Backend switch fails
+- Confirm target backend CLI (`claude`/`gemini`) is installed and authenticated.
 
-`xsfire-camp` wraps **Codex CLI (codex-rs)** as an **ACP (Agent Client Protocol)** agent so ACP clients (for example, Zed or ACP-enabled VS Code extensions) can run Codex as an execution-first working session, not just a chat window.
+4. npm package not found
+- Check latest release workflow and npm publish auth (`NPM_TOKEN` or trusted publishing).
 
-It is designed so ACP sessions and CLI sessions can share the same `CODEX_HOME` source of truth, making handoff between IDE and terminal smoother.
+5. Zed community extension not visible yet
+- Registry PR may still be open or waiting for maintainer merge queue.
 
-### theprometheus / Augmented Technology Framing
+## Docs Index
 
-- This project is aligned with `theprometheus` and treats AI as **augmented intelligence**, not replacement intelligence.
-- The primary objective is not automation alone, but improving human judgment quality, operational safety, and post-hoc traceability.
-- Design priorities:
-  - Session continuity across IDE and CLI
-  - Behavioral visibility through structured tool/plan/approval traces
-  - Human control via approval policies and explicit execution gates
+### Architecture and backend
+- `docs/backend/backends.md`
+- `docs/backend/session_store.md`
+- `docs/backend/policies.md`
+- `docs/reference/acp_standard_spec.md`
+- `docs/reference/event_handling.md`
+- `docs/reference/codex_home_overview.md`
 
-### What It Provides
+### Planning and roadmap
+- `docs/plans/roadmap.md`
+- `docs/plans/next_cycle_execution_plan.md`
+- `docs/plans/orchestration_plan_backend_driver_setup_context.md`
 
-- ACP stdio agent wrapper for Codex
-- Session continuity:
-  ACP `session_id` is aligned with Codex thread identity and shared session metadata in `CODEX_HOME`
-- Canonical global logging is enabled by default via `ACP_HOME` (default `~/.acp`) while preserving backend-native logs
-- Embedded context / mentions and image input support (when client supports it)
-- Tool-call streaming and result updates (shell, `apply_patch`, web search, MCP tools)
-- Approval flow surfaced through ACP `RequestPermission`
-- Plan/TODO/terminal progression updates via ACP `SessionUpdate`
-- Default execution protocol (baseline for all use cases):
-  `Goal lock -> Rubric (Must/Should + evidence) -> Research -> Plan -> Implement -> Verify -> Score`, iterating until `Must=100%` with continuous Plan UI updates
-- Slash-command parity focus:
-  `/setup`, `/review`, `/review-branch`, `/review-commit`, `/compact`, `/undo`, `/init`, `/status`, `/sessions`, `/load`, `/mcp`, `/skills`, `/monitor`, `/monitor retro`, `/vector`, `/new-window`, `/experimental`
-- `/skills` options:
-  `--enabled`, `--disabled`, `--scope <scope>`, `--reload`, `<keyword>` (usage/examples are shown in the `/skills` response)
-- MCP server merge:
-  client-provided MCP endpoints are merged into codex-rs configuration
+### Quality and release
+- `docs/quality/verification_guidance.md`
+- `docs/quality/qa_checklist.md`
+- `docs/releases/release_notes_v0.9.8.md`
+- `docs/releases/release_notes_v0.9.10.md`
+- `docs/releases/release_notes_v0.9.11.md`
+- `docs/releases/release_notes_v0.9.12.md`
+- `docs/releases/release_notes_v0.9.13.md`
+- `docs/releases/release_notes_v0.9.14.md`
 
-### Why It Is Useful
+### Zed extension
+- `docs/zed/zed_extension_pr_template.md`
+- `docs/zed/extensions_toml_sample.md`
+- `docs/zed/install_shared_settings.md`
 
-- Client independence:
-  keep one stable agent workflow across ACP clients
-- Session continuity:
-  continue work between IDE and CLI with shared `CODEX_HOME`
-- Better traceability:
-  actions (tool calls/plans/terminal outputs) remain structured and reviewable
-- Safer automation:
-  approval checkpoints guard risky execution and patch application
+## README Update Checklist (for each release)
 
-### Quick Start (Binary)
+1. Version strings and examples align with the current release.
+2. Quick Start command flags still match binary behavior.
+3. Verification commands are still valid.
+4. `docs/` links are alive and accurate.
+5. npm and Zed registry status text is current.
+6. New release notes link is added.
 
-Build:
+## English Summary
 
-```
-cargo build --release
-```
+`xsfire-camp` is an ACP bridge around Codex CLI.
+It focuses on:
+- execution-first sessions instead of plain chat,
+- continuity across IDE and terminal via shared `CODEX_HOME`,
+- traceable tool/plan/approval updates,
+- explicit control gates for risky operations.
 
-Run (ACP agent over stdio):
-
-```
-OPENAI_API_KEY=sk-... CODEX_HOME="$HOME/.codex" target/release/xsfire-camp
-```
-
-Backend selection (default: `codex`):
-
-```
-target/release/xsfire-camp --backend=codex
-target/release/xsfire-camp --backend=claude-code
-target/release/xsfire-camp --backend=gemini
-target/release/xsfire-camp --backend=multi
-```
-
-Notes:
-
-- `claude-code` / `gemini` are minimal backend implementations at this stage.
-- Those CLIs must be installed and authenticated separately.
-- In `--backend=multi`, switch inside a thread with `/backend codex`, `/backend claude-code`, or `/backend gemini`.
-- Authentication dispatch is method-id based: `chatgpt` / `codex-api-key` / `openai-api-key` route to Codex, while `claude-cli` / `gemini-cli` route to each CLI backend.
-
-### Configuration/Auth Snapshot (EN)
-
-| Type | Key / Method | Required | Notes |
-| --- | --- | --- | --- |
-| Env | `OPENAI_API_KEY` | Optional | One Codex auth path |
-| Env | `CODEX_API_KEY` | Optional | One Codex auth path |
-| Env | `CODEX_HOME` | Recommended | Shared session metadata path |
-| Env | `ACP_HOME` | Optional | Canonical log path (default `~/.acp`) |
-| Method ID | `chatgpt` / `codex-api-key` / `openai-api-key` | Depends | Routed to Codex backend |
-| Method ID | `claude-cli` / `gemini-cli` | Depends | Routed to corresponding CLI backend |
-| Backend override | `XSFIRE_CLAUDE_BIN`, `XSFIRE_CLAUDE_ARGS`, `XSFIRE_GEMINI_BIN`, `XSFIRE_GEMINI_ARGS`, `XSFIRE_GEMINI_APPROVAL_MODE` | Optional | Override backend binary/args/approval behavior |
-
-### Quick Start (npm)
-
-Run:
-
-```
-npx @haegyung/xsfire-camp
-```
-
-Install globally (to expose `xsfire-camp` on PATH):
-
-```
-npm i -g @haegyung/xsfire-camp
-```
-
-### Clients
-
-- Zed:
-  register this binary as a custom ACP agent (see Korean section for full `settings.json` example).
-- VS Code:
-  requires a community ACP client extension. Some extensions run agents as `<command> acp`; this binary accepts `acp`/`--acp` as no-ops for compatibility.
-- Other ACP clients: see [ACP compatible clients](https://agentclientprotocol.com/overview/clients).
-
-### Automation / Release
-
-```
-scripts/build_and_install.sh
-scripts/tag_release.sh vX.Y.Z
-```
-
-### Verification
-
-```
-cargo test
-node npm/testing/test-platform-detection.js
-```
-
-### Documentation
-
-- Documentation index: `docs/README.md`
-- ACP mapping reference: `docs/reference/acp_standard_spec.md`
-- Event mapping: `docs/reference/event_handling.md`
-- Verification guide: `docs/quality/verification_guidance.md`
-
-### Releases
-
-Prebuilt binaries and release assets:
-[haegyung/xsfire-camp releases](https://github.com/haegyung/xsfire-camp/releases)
+If you are new, start from **Quick Start**, then jump to **Docs Index**.
 
 ## License
 
-CC BY-NC-SA 4.0 (`CC-BY-NC-SA-4.0`)
-https://creativecommons.org/licenses/by-nc-sa/4.0/
+CC BY-NC-SA 4.0. See `LICENSE`.
