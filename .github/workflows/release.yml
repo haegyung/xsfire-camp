@@ -260,7 +260,8 @@ jobs:
           echo "Configured OIDC repository: ${NPM_PUBLISH_OIDC_REPO}"
           echo "Current repository: ${GITHUB_REPOSITORY}"
           if [ "${GITHUB_REPOSITORY}" != "${NPM_PUBLISH_OIDC_REPO}" ]; then
-            echo "::warning::This run is for ${GITHUB_REPOSITORY}, but trusted publishing is expected for ${NPM_PUBLISH_OIDC_REPO}."
+            echo "::error::OIDC publish path mismatch: workflow is running on ${GITHUB_REPOSITORY}, but trusted publishing is configured for ${NPM_PUBLISH_OIDC_REPO}."
+            exit 1
           fi
 
       - name: Setup Node.js
@@ -395,7 +396,8 @@ jobs:
           echo "Configured OIDC repository: ${NPM_PUBLISH_OIDC_REPO}"
           echo "Current repository: ${GITHUB_REPOSITORY}"
           if [ "${GITHUB_REPOSITORY}" != "${NPM_PUBLISH_OIDC_REPO}" ]; then
-            echo "::warning::This run is for ${GITHUB_REPOSITORY}, but trusted publishing is expected for ${NPM_PUBLISH_OIDC_REPO}."
+            echo "::error::OIDC publish path mismatch: workflow is running on ${GITHUB_REPOSITORY}, but trusted publishing is configured for ${NPM_PUBLISH_OIDC_REPO}."
+            exit 1
           fi
 
       - name: Setup Node.js
