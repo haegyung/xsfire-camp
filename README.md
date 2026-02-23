@@ -137,7 +137,7 @@ Package:
 - Confirm target backend CLI (`claude`/`gemini`) is installed and authenticated.
 
 4. npm package not found
-- Check latest release workflow and npm publish auth (`NPM_TOKEN` or trusted publishing).
+- Check latest release workflow and npm publish auth (`NPM_TOKEN` secret, or trusted publishing via `NPM_OIDC_PUBLISH=true`/`1` and npm trusted publisher registration for `@haegyung`).
 
 5. Zed community extension not visible yet
 - Registry PR may still be open or waiting for maintainer merge queue.

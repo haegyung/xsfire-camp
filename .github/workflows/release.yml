@@ -238,11 +238,18 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
-          if [ -n "${NPM_TOKEN:-}" ] || [ "${NPM_OIDC_PUBLISH:-}" = "1" ]; then
+          NPM_OIDC_PUBLISH_ENABLED=0
+          case "${NPM_OIDC_PUBLISH,,}" in
+            1|true|yes|on)
+              NPM_OIDC_PUBLISH_ENABLED=1
+              ;;
+          esac
+
+          if [ -n "${NPM_TOKEN:-}" ] || [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
             echo "enabled=1" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=0" >> "$GITHUB_OUTPUT"
-            echo "NPM publishing not configured (NPM_TOKEN empty and NPM_OIDC_PUBLISH!=1). Skipping."
+            echo "NPM publishing not configured (NPM_TOKEN empty and NPM_OIDC_PUBLISH is not enabled). Skipping."
           fi
 
       - name: Setup Node.js
@@ -266,20 +273,61 @@ jobs:
         if: steps.publish_config.outputs.enabled == '1'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
+          NPM_CONFIG_USERCONFIG="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+
           # If NPM_TOKEN is not set, we fall back to npm "trusted publishing" (OIDC) via --provenance.
           # If neither is configured, npm will fail with ENEEDAUTH.
+          NPM_OIDC_PUBLISH_ENABLED=0
+          case "${NPM_OIDC_PUBLISH,,}" in
+            1|true|yes|on)
+              NPM_OIDC_PUBLISH_ENABLED=1
+              ;;
+          esac
+
           if [ -n "${NPM_TOKEN:-}" ]; then
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG}"
-          else
+            echo "Using NPM_TOKEN for authentication."
+            PUBLISH_ARGS="--access public --provenance"
+            USING_OIDC=0
+          elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
             echo "registry=https://registry.npmjs.org/" > "${NPM_CONFIG_USERCONFIG}"
+            echo "Using GitHub OIDC trusted publishing (npm provenance)."
+            PUBLISH_ARGS="--access public --provenance"
+            USING_OIDC=1
+          else
+            echo "No npm publish authentication method is enabled."
+            exit 1
+          fi
+
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            if npm whoami >/tmp/npm-whoami-platform.log 2>&1; then
+              echo "Authenticated to npm as $(cat /tmp/npm-whoami-platform.log)."
+            else
+              echo "NPM_TOKEN authentication check failed before publish."
+              cat /tmp/npm-whoami-platform.log
+              exit 1
+            fi
           fi
 
           for pkg in npm-packages/*; do
             if [ -d "$pkg" ]; then
               echo "Publishing $(basename $pkg)..."
               cd "$pkg"
-              npm publish --access public --provenance
+              if ! npm publish $PUBLISH_ARGS 2> /tmp/npm-publish-platform.log; then
+                PUBLISH_RESULT=$?
+                if [ "$USING_OIDC" -eq 1 ]; then
+                  echo "Trusted publishing failed for $(basename "$pkg")."
+                  echo "1) Verify '@haegyung' scope is configured as a trusted publisher for this repository in npm."
+                  echo "2) Confirm this workflow has 'id-token: write' permission and uses npm >= 9.5."
+                  echo "3) Retry after enabling a valid repository secret NPM_TOKEN."
+                  cat /tmp/npm-publish-platform.log
+                  exit 1
+                fi
+                cat /tmp/npm-publish-platform.log 2>/dev/null || true
+                exit "$PUBLISH_RESULT"
+              fi
               cd ../..
             fi
           done
@@ -302,11 +350,18 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
-          if [ -n "${NPM_TOKEN:-}" ] || [ "${NPM_OIDC_PUBLISH:-}" = "1" ]; then
+          NPM_OIDC_PUBLISH_ENABLED=0
+          case "${NPM_OIDC_PUBLISH,,}" in
+            1|true|yes|on)
+              NPM_OIDC_PUBLISH_ENABLED=1
+              ;;
+          esac
+
+          if [ -n "${NPM_TOKEN:-}" ] || [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
             echo "enabled=1" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=0" >> "$GITHUB_OUTPUT"
-            echo "NPM publishing not configured (NPM_TOKEN empty and NPM_OIDC_PUBLISH!=1). Skipping."
+            echo "NPM publishing not configured (NPM_TOKEN empty and NPM_OIDC_PUBLISH is not enabled). Skipping."
           fi
 
       - name: Setup Node.js
@@ -336,15 +391,53 @@ jobs:
         if: steps.publish_config.outputs.enabled == '1'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_OIDC_PUBLISH: ${{ vars.NPM_OIDC_PUBLISH }}
         run: |
+          NPM_CONFIG_USERCONFIG="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+
+          NPM_OIDC_PUBLISH_ENABLED=0
+          case "${NPM_OIDC_PUBLISH,,}" in
+            1|true|yes|on)
+              NPM_OIDC_PUBLISH_ENABLED=1
+              ;;
+          esac
+
           if [ -n "${NPM_TOKEN:-}" ]; then
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG}"
-          else
+            echo "Using NPM_TOKEN for authentication."
+            PUBLISH_ARGS="--access public --provenance"
+            USING_OIDC=0
+            if npm whoami >/tmp/npm-whoami-base.log 2>&1; then
+              echo "Authenticated to npm as $(cat /tmp/npm-whoami-base.log)."
+            else
+              echo "NPM_TOKEN authentication check failed before publish."
+              cat /tmp/npm-whoami-base.log
+              exit 1
+            fi
+          elif [ "$NPM_OIDC_PUBLISH_ENABLED" = "1" ]; then
             echo "registry=https://registry.npmjs.org/" > "${NPM_CONFIG_USERCONFIG}"
+            echo "Using GitHub OIDC trusted publishing (npm provenance)."
+            PUBLISH_ARGS="--access public --provenance"
+            USING_OIDC=1
+          else
+            echo "No npm publish authentication method is enabled."
+            exit 1
           fi
 
           cd npm
-          npm publish --access public --provenance
+          if ! npm publish $PUBLISH_ARGS 2> /tmp/npm-publish-base.log; then
+            PUBLISH_RESULT=$?
+            if [ "$USING_OIDC" -eq 1 ]; then
+              echo "Trusted publishing failed for base package."
+              echo "1) Verify '@haegyung' scope is configured as a trusted publisher for this repository in npm."
+              echo "2) Confirm this workflow has 'id-token: write' permission and uses npm >= 9.5."
+              echo "3) Retry after enabling a valid repository secret NPM_TOKEN."
+              cat /tmp/npm-publish-base.log
+              exit 1
+            fi
+            cat /tmp/npm-publish-base.log 2>/dev/null || true
+            exit "$PUBLISH_RESULT"
+          fi
 
   create-release:
     name: Create Release
