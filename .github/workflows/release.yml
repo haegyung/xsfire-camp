@@ -18,6 +18,8 @@ env:
   CARGO_TERM_COLOR: always
   NPM_PUBLISH_OIDC_SCOPE: ${{ vars.NPM_PUBLISH_OIDC_SCOPE || '@haegyung' }}
   NPM_PUBLISH_OIDC_REPO: ${{ vars.NPM_PUBLISH_OIDC_REPO || 'theprometheusxyz/xsfire-camp' }}
+  NPM_PUBLISH_OIDC_SCOPE_EXPECTED: '@haegyung'
+  NPM_PUBLISH_OIDC_REPO_EXPECTED: 'theprometheusxyz/xsfire-camp'
 
 jobs:
   get-version:
@@ -256,6 +258,14 @@ jobs:
       - name: Verify OIDC target metadata
         if: steps.publish_config.outputs.enabled == '1'
         run: |
+          if [ "${NPM_PUBLISH_OIDC_SCOPE}" != "${NPM_PUBLISH_OIDC_SCOPE_EXPECTED}" ]; then
+            echo "::error::OIDC scope mismatch: configured scope is ${NPM_PUBLISH_OIDC_SCOPE}, but expected ${NPM_PUBLISH_OIDC_SCOPE_EXPECTED}."
+            exit 1
+          fi
+          if [ "${NPM_PUBLISH_OIDC_REPO}" != "${NPM_PUBLISH_OIDC_REPO_EXPECTED}" ]; then
+            echo "::error::OIDC repository mismatch: configured repository is ${NPM_PUBLISH_OIDC_REPO}, but expected ${NPM_PUBLISH_OIDC_REPO_EXPECTED}."
+            exit 1
+          fi
           echo "Configured OIDC scope: ${NPM_PUBLISH_OIDC_SCOPE}"
           echo "Configured OIDC repository: ${NPM_PUBLISH_OIDC_REPO}"
           echo "Current repository: ${GITHUB_REPOSITORY}"
@@ -392,6 +402,14 @@ jobs:
       - name: Verify OIDC target metadata
         if: steps.publish_config.outputs.enabled == '1'
         run: |
+          if [ "${NPM_PUBLISH_OIDC_SCOPE}" != "${NPM_PUBLISH_OIDC_SCOPE_EXPECTED}" ]; then
+            echo "::error::OIDC scope mismatch: configured scope is ${NPM_PUBLISH_OIDC_SCOPE}, but expected ${NPM_PUBLISH_OIDC_SCOPE_EXPECTED}."
+            exit 1
+          fi
+          if [ "${NPM_PUBLISH_OIDC_REPO}" != "${NPM_PUBLISH_OIDC_REPO_EXPECTED}" ]; then
+            echo "::error::OIDC repository mismatch: configured repository is ${NPM_PUBLISH_OIDC_REPO}, but expected ${NPM_PUBLISH_OIDC_REPO_EXPECTED}."
+            exit 1
+          fi
           echo "Configured OIDC scope: ${NPM_PUBLISH_OIDC_SCOPE}"
           echo "Configured OIDC repository: ${NPM_PUBLISH_OIDC_REPO}"
           echo "Current repository: ${GITHUB_REPOSITORY}"
