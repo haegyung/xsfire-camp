@@ -327,6 +327,7 @@ jobs:
             {
               echo "registry=https://registry.npmjs.org/"
               echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+              echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
             } > "${NPM_CONFIG_USERCONFIG}"
             echo "OIDC publish is enabled; using NODE_AUTH_TOKEN from workflow environment."
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
@@ -482,6 +483,7 @@ jobs:
             {
               echo "registry=https://registry.npmjs.org/"
               echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
+              echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
             } > "${NPM_CONFIG_USERCONFIG}"
             echo "OIDC publish is enabled; using NODE_AUTH_TOKEN from workflow environment."
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
