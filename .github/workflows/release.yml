@@ -327,9 +327,8 @@ jobs:
             {
               echo "registry=https://registry.npmjs.org/"
               echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-              echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
             } > "${NPM_CONFIG_USERCONFIG}"
-            echo "NODE_AUTH_TOKEN was written to npmrc for OIDC publish."
+            echo "OIDC publish is enabled; using NODE_AUTH_TOKEN from workflow environment."
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
@@ -483,9 +482,8 @@ jobs:
             {
               echo "registry=https://registry.npmjs.org/"
               echo "${NPM_PUBLISH_OIDC_SCOPE}:registry=https://registry.npmjs.org/"
-              echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
             } > "${NPM_CONFIG_USERCONFIG}"
-            echo "NODE_AUTH_TOKEN was written to npmrc for OIDC publish."
+            echo "OIDC publish is enabled; using NODE_AUTH_TOKEN from workflow environment."
             echo "Using GitHub OIDC trusted publishing (npm provenance) for scope ${NPM_PUBLISH_OIDC_SCOPE} + ${NPM_PUBLISH_OIDC_REPO}."
             PUBLISH_ARGS="--access public --provenance"
             USING_OIDC=1
