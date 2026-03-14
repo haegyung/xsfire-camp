@@ -8138,7 +8138,15 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn test_init() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+        let _visibility_restore = EnvVarRestore::set("ACP_UI_VISIBILITY_MODE", Some("full"));
+        let _chunk_restore = EnvVarRestore::set("ACP_UI_TEXT_CHUNK_MAX_CHARS", Some("12000"));
+
         let (session_id, client, thread, message_tx, local_set) = setup(vec![]).await?;
         let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
 
