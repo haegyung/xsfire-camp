@@ -1,5 +1,5 @@
 {
-	"name": "@haegyung/${PACKAGE_NAME}",
+	"name": "@theprometheusxyz/${PACKAGE_NAME}",
 	"version": "${VERSION}",
 	"description": "An ACP-compatible coding agent powered by Codex - ${OS} ${ARCH} binary",
 	"license": "CC-BY-NC-SA-4.0",

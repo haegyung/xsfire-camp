@@ -36,16 +36,14 @@ function getPlatformPackage() {
     process.exit(1);
   }
 
-  return `@haegyung/${packageName}`;
+  return `@theprometheusxyz/${packageName}`;
 }
 
 // Locate the binary
 function getBinaryPath() {
   const packageName = getPlatformPackage();
   const binaryName =
-    process.platform === "win32"
-      ? "xsfire-camp.exe"
-      : "xsfire-camp";
+    process.platform === "win32" ? "xsfire-camp.exe" : "xsfire-camp";
 
   try {
     // Try to resolve the platform-specific package

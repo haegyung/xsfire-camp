@@ -23,12 +23,12 @@ fi
 sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$PACKAGE_JSON"
 
 # Update optionalDependencies versions
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-darwin-arm64\": \".*\"/\"@haegyung\\/xsfire-camp-darwin-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-darwin-x64\": \".*\"/\"@haegyung\\/xsfire-camp-darwin-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-linux-arm64\": \".*\"/\"@haegyung\\/xsfire-camp-linux-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-linux-x64\": \".*\"/\"@haegyung\\/xsfire-camp-linux-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-win32-arm64\": \".*\"/\"@haegyung\\/xsfire-camp-win32-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
-sed -i.bak "s/\"@haegyung\\/xsfire-camp-win32-x64\": \".*\"/\"@haegyung\\/xsfire-camp-win32-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-darwin-arm64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-darwin-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-darwin-x64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-darwin-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-linux-arm64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-linux-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-linux-x64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-linux-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-win32-arm64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-win32-arm64\": \"$VERSION\"/" "$PACKAGE_JSON"
+sed -i.bak "s/\"@theprometheusxyz\\/xsfire-camp-win32-x64\": \".*\"/\"@theprometheusxyz\\/xsfire-camp-win32-x64\": \"$VERSION\"/" "$PACKAGE_JSON"
 
 # Remove backup file
 rm -f "$PACKAGE_JSON.bak"

@@ -53,7 +53,7 @@ OPENAI_API_KEY=sk-... xsfire-camp
 Or via npm:
 
 ```
-npx @haegyung/xsfire-camp
+npx @theprometheusxyz/xsfire-camp
 ```
 
 ## License

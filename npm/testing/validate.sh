@@ -76,12 +76,12 @@ echo
 # 5. Verify optional dependencies list
 echo "5. Verifying platform packages..."
 EXPECTED_PACKAGES=(
-  "@haegyung/xsfire-camp-darwin-arm64"
-  "@haegyung/xsfire-camp-darwin-x64"
-  "@haegyung/xsfire-camp-linux-arm64"
-  "@haegyung/xsfire-camp-linux-x64"
-  "@haegyung/xsfire-camp-win32-arm64"
-  "@haegyung/xsfire-camp-win32-x64"
+  "@theprometheusxyz/xsfire-camp-darwin-arm64"
+  "@theprometheusxyz/xsfire-camp-darwin-x64"
+  "@theprometheusxyz/xsfire-camp-linux-arm64"
+  "@theprometheusxyz/xsfire-camp-linux-x64"
+  "@theprometheusxyz/xsfire-camp-win32-arm64"
+  "@theprometheusxyz/xsfire-camp-win32-x64"
 )
 
 missing_packages=0
