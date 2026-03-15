@@ -1,8 +1,14 @@
-# ACP adapter for Codex
+# ACP adapter for multi-backend ACP execution
 
 Use [Codex](https://github.com/openai/codex) from [ACP-compatible](https://agentclientprotocol.com) clients such as [Zed](https://zed.dev)!
 
-This tool implements an ACP adapter around the Codex CLI, supporting:
+This tool implements an ACP adapter with multi-backend support for:
+
+- Codex CLI (via codex-rs)
+- Claude Code CLI
+- Gemini CLI
+
+It also supports:
 
 - Context @-mentions
 - Images
@@ -50,11 +56,7 @@ You can then use `xsfire-camp` as a regular ACP agent:
 OPENAI_API_KEY=sk-... xsfire-camp
 ```
 
-Or via npm:
-
-```
-npx @theprometheusxyz/xsfire-camp
-```
+The `npm/` directory is retained for wrapper metadata and local validation only. `xsfire-camp` is no longer distributed through npm.
 
 ## License
 

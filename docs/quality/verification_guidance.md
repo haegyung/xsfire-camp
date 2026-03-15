@@ -6,6 +6,17 @@
 - `docs/reference/acp_standard_spec.md`
 - `docs/reference/event_handling.md`
 
+## 0-b. 환경 독립 실행 규약(선행 단계)
+
+이 워크플로우 이전에, 환경 독립형 구현 규약을 먼저 고정한다.
+해당 규약은 모델/에이전트에 상관없이 재사용 가능하며,
+항목은 `Goal -> Rubric -> Iteration` 형식으로 고정해야 한다.
+
+참고 문서:
+- `docs/quality/cross_environment_execution_protocol.md`
+- 반복 기록 템플릿:
+- `docs/quality/iteration_fit_template.md`
+
 ## 0. 사전 준비
 
 ### Step 0-1. 작업 디렉토리 확인
@@ -20,18 +31,17 @@ pwd
 
 - 출력 경로가 저장소 루트(예: `.../xsfire`)여야 합니다.
 
-### Step 0-2. Rust/Node 실행 가능 확인
+### Step 0-2. Rust 실행 가능 확인
 
 명령:
 
 ```bash
 cargo --version
-node --version
 ```
 
 기대 결과:
 
-- 두 명령 모두 종료 코드 `0`.
+- 명령 종료 코드 `0`.
 - 버전 문자열이 출력되고 `command not found`가 없어야 합니다.
 
 ## 1. 자동 기본 게이트
@@ -62,18 +72,18 @@ cargo test
 - 종료 코드 `0`.
 - `thread`/`prompt_args`/`session_store` 관련 테스트가 모두 통과합니다.
 
-### Step 1-3. npm 플랫폼 감지 테스트
+### Step 1-3. release binary 빌드 확인
 
 명령:
 
 ```bash
-node npm/testing/test-platform-detection.js
+cargo build --release
 ```
 
 기대 결과:
 
 - 종료 코드 `0`.
-- 플랫폼 분기 검증이 실패 없이 완료됩니다.
+- `target/release/xsfire-camp` 바이너리가 생성됩니다.
 
 ## 2. ACP 호환 Smoke(초안) 자동 점검
 

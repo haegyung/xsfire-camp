@@ -1,58 +1,62 @@
-# Release/Registry Unblock Checklist (v0.9.15)
+# Release/Registry Unblock Checklist (v0.9.18)
 
 ## Goal
-`v0.9.15`의 마지막 외부 차단 2건(npm publish, Zed registry merge)을 닫아 실제 배포 반영을 완료한다.
+Unblock `v0.9.18` ACP registry visibility and release operations with the current binary-first distribution policy.
 
-## Current Blockers
-1. npm registry 미반영
-- 증상: `npm view @haegyung/xsfire-camp` -> `E404`
-- 근거: release workflow run `22294528645` 실패 로그에 `ENEEDAUTH`, `NPM_TOKEN` empty
+## Current Status
+1. GitHub release binaries are the only active distribution channel
+- Evidence:
+  - `release.yml` now builds target archives and creates a GitHub release without npm publish jobs.
+  - `README.md` now directs users to GitHub release binaries and ACP registry installation notes.
+  - Historical npm investigation remains tracked in `docs/guides/npm_publish_recovery.md`, but npm is no longer part of the active release path.
 
-2. Zed registry PR 미병합
-- PR: `https://github.com/zed-industries/extensions/pull/4811`
-- 상태: `OPEN`, `mergeStateStatus=BLOCKED` (merge queue + maintainer 권한 필요)
+2. ACP registry PR still requires maintainer-side action
+- Target PR: `https://github.com/agentclientprotocol/registry/pull/93`
+- Evidence:
+  - PR head includes the `v0.9.18` entry refresh.
+  - Latest `Build Registry` workflow run `23106246048` is `completed` with `conclusion=action_required`.
+  - `gh pr checks 93 --repo agentclientprotocol/registry` reports no passing checks while the blocker remains.
 
-## Checklist A: npm Publish 복구
+3. ACP registry content itself is ready
+- Evidence:
+  - `registry_work/registry/xsfire-camp/agent.json` targets `0.9.18`.
+  - Local auth check and local registry build both pass.
+- Interpretation:
+  - The ACP PR is blocked on upstream workflow approval, not on local entry correctness.
 
-### A-1. 옵션 결정
-다음 중 하나를 선택:
-1. Trusted Publishing (OIDC) 사용
-2. `NPM_TOKEN` repository secret 사용
+## Checklist: ACP Registry PR Unblock
+1. Check PR metadata:
+   ```bash
+   gh pr view 93 --repo agentclientprotocol/registry --json state,mergeStateStatus,url
+   ```
+2. Check PR checks:
+   ```bash
+   gh pr checks 93 --repo agentclientprotocol/registry
+   ```
+3. If check conclusion is `action_required`, post exactly one English status comment with:
+   - blocker summary
+   - run ID/URL
+   - requested maintainer action (approve/re-run)
+4. Confirm the entry still matches `v0.9.18` release assets before each new push.
+5. Wait for state change and re-check checks.
+6. Once checks pass, keep PR updates in English until merge.
 
-### A-2. Trusted Publishing 경로
-1. npm 패키지/조직 설정에서 `@haegyung` scope의 GitHub Actions를 trusted publisher로 등록하고 repository를 `theprometheusxyz/xsfire-camp`로 맞춤
-2. workflow의 `id-token: write` 권한은 이미 있음 (`.github/workflows/release.yml`)
-3. 설정 후 `release.yml` 재실행
-4. 성공 확인:
-```bash
-npm view @haegyung/xsfire-camp version
-```
-
-### A-3. NPM_TOKEN 경로
-1. npm에서 publish 권한 토큰 발급
-2. GitHub repo secret `NPM_TOKEN` 등록
-3. `release.yml` 재실행
-4. 성공 확인:
-```bash
-npm view @haegyung/xsfire-camp version
-```
-
-## Checklist B: Zed Registry 병합
-1. PR #4811 유지 (이미 `v0.9.15` 반영됨)
-2. maintainer가 merge queue로 enqueue/merge
-3. 병합 확인:
-```bash
-gh pr view 4811 --repo zed-industries/extensions --json state,mergedAt,url
+## English Comment Template (Registry PR)
+```text
+Status update: the current Build Registry run is blocked with `action_required` (run: <RUN_URL_OR_ID>).
+Could a maintainer please approve/re-run this workflow for the fork-originated PR?
+I will post a follow-up after the check status changes.
 ```
 
 ## Verification Commands
 ```bash
-gh run list --repo theprometheusxyz/xsfire-camp --workflow release.yml --limit 3
-npm view @haegyung/xsfire-camp version
-gh pr view 4811 --repo zed-industries/extensions --json state,mergeStateStatus,url
+gh pr view 93 --repo agentclientprotocol/registry --json state,mergeStateStatus,url
+gh pr checks 93 --repo agentclientprotocol/registry
+gh run list --repo agentclientprotocol/registry --branch add-xsfire-camp-agent --limit 3
+gh run view 23106246048 --repo agentclientprotocol/registry
 ```
 
 ## Done Criteria
-1. npm 패키지 버전 조회 성공
-2. Zed PR merged 상태 확인
-3. 이 문서의 Blockers 섹션을 "resolved"로 업데이트
+1. ACP registry PR check status is no longer blocked by `action_required`, or the blocker is explicitly tracked with owner and next action.
+2. Registry PR communication log remains English-only.
+3. GitHub release binary URLs referenced by `agent.json` stay aligned with the latest shipped version.

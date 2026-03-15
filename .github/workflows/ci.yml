@@ -112,7 +112,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   npm-validation:
-    name: NPM Package Validation
+    name: Node Wrapper Validation
     runs-on: ubuntu-latest
 
     steps:

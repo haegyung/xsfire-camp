@@ -10,16 +10,22 @@ Use this checklist before tagging/publishing the extension release.
 2. **Code/Tests**
    - [x] `cargo test` (unit tests and event coverage) passes locally.
    - [x] `TaskState` delegates to `PromptState` to reuse event handling.
-3. **Zed-specific**
+3. **Sequential Release Fitness (X/X')**
+   - [ ] `fit_score`, `Context-Fit` decision, and `Release / Feedback` are recorded in `docs/quality/iteration_fit_template.md`.
+   - [ ] Core invariants (`X`: safety, correctness, traceability, operability) remain retained in release candidate `X'`.
+   - [ ] `X'` growth trend is documented: added value signals and resolved weak points.
+4. **ACP registry-specific**
    - [x] `extension.toml` references live `vX.Y.Z` binaries for darwin/linux/windows targets with `sha256`.
-   - [x] `docs/zed/extensions_toml_sample.md` updated to the latest extension entry format.
-   - [x] PR body template updated in `docs/zed/zed_extension_pr_template.md`.
-4. **Release Artifacts**
-   - [x] Cargo/npm versions are consistent (`Cargo.toml` = `X.Y.Z`, `npm/package.json` = `X.Y.Z`).
+   - [x] `docs/guides/github_registry_release_runbook.md` is updated and linked from `README.md` and `docs/README.md`.
+   - [ ] ACP registry PR status/check snapshot is captured (`gh pr view` + `gh pr checks`) and attached to release evidence.
+   - [ ] Any ACP registry PR comment is written in English only and includes run/check evidence.
+   - [x] `docs/zed/extensions_toml_sample.md` and `docs/zed/zed_extension_pr_template.md` are marked as legacy reference docs.
+5. **Release Artifacts**
+   - [x] Cargo version and release tag are consistent (`Cargo.toml` = `X.Y.Z`, tag = `vX.Y.Z`).
    - [x] `vX.Y.Z` tag exists.
    - [x] GitHub Release `vX.Y.Z` created.
    - [x] Additional target assets (`darwin-*`, `linux-*`, `windows-*`) uploaded.
-5. **Manual verification**
+6. **Manual verification**
    - [ ] Launch ACP with `CODEX_HOME` pointing to CLI home and run `/setup` first.
    - [ ] Run `/status` -> `/monitor` -> `/vector` and verify setup plan step `Verify: run /status, /monitor, and /vector` reaches `completed`.
    - [ ] Change one config option (`Model`, `Approval Preset`, or task monitoring options) and confirm Plan progress updates immediately.
@@ -27,12 +33,12 @@ Use this checklist before tagging/publishing the extension release.
    - [ ] Inspect `logs/codex_chats/...` for `Plan`, `ToolCall`, and `RequestPermission` entries.
    - [ ] (Optional) Verify canonical log under `ACP_HOME` (default `~/.acp`) is created and appends `canonical.jsonl`.
    - [ ] Confirm Zed agent panel (if available) shows plan/tool call updates as expected.
-  6. **ACP compatibility (based on `docs/reference/acp_standard_spec.md`)**
+7. **ACP compatibility (based on `docs/reference/acp_standard_spec.md`)**
    - [ ] Run `scripts/acp_compat_smoke.sh --strict` and archive the generated report under `logs/smoke/`.
    - [ ] If strict mode fails, attach the corresponding failure log from `logs/smoke/logs/*.log` to the release issue/PR.
    - [ ] `initialize` returns `protocolVersion=v1` and advertises capability contract (`embeddedContext=true`, `image=true`, `audio=false`, `mcp.http=true`, `mcp.sse=false`, `session.list=true`).
    - [ ] `codex` backend passes core ACP flow: `authenticate` -> `session/new|load` -> repeated `session/prompt` -> `session/cancel` and returns valid JSON-RPC 2.0 envelopes.
-   - [ ] `claude-code`/`gemini` backends keep declared behavior: `session/load`, `session/set_mode`, `session/set_model`, `session/set_config_option` return `invalid_params` (or documented no-op/success for `session/cancel`).
+   - [ ] `claude-code`/`gemini` backends keep declared behavior: `session/load` and `session/set_model` are supported; `session/set_mode` returns `invalid_params`; `session/set_config_option` supports model changes and rejects unsupported options; `session/cancel` remains documented no-op.
    - [ ] `session/update` stream includes expected update types (`AgentMessageChunk`, `AgentThoughtChunk`, `ToolCall`, `ToolCallUpdate`, `Plan`, `AvailableCommandsUpdate`, `CurrentModeUpdate`) without schema violations.
    - [ ] `ToolCall`/`Plan` status transitions stay in allowed enums (`pending`, `in_progress`, `completed`, `failed`) and do not regress state order during one turn.
    - [ ] `session/request_permission` round-trip is recorded with request/response pair in canonical logs when `ACP_HOME` logging is enabled.

@@ -1,8 +1,8 @@
 # xsfire-camp
 
-ACP(Agent Client Protocol) 클라이언트에서 Codex CLI를 실행형 에이전트로 연결하는 브리지입니다.
+ACP(Agent Client Protocol) 클라이언트에서 Codex, Claude Code, Gemini를 실행형 에이전트로 라우팅하는 통합 브리지입니다.
 
-`xsfire-camp` lets ACP-compatible clients (for example Zed) run Codex CLI as an execution-first agent session.
+`xsfire-camp` lets ACP-compatible clients (for example Zed) run Codex CLI, Claude Code CLI, and Gemini CLI as execution-first agent sessions.
 
 - ACP: https://agentclientprotocol.com/
 - Codex: https://github.com/openai/codex
@@ -28,7 +28,6 @@ target/release/xsfire-camp --backend=multi
 4. Verify
 ```bash
 cargo test
-node npm/testing/test-platform-detection.js
 ```
 
 ## Who This Is For
@@ -73,6 +72,82 @@ Notes:
 | Monitoring | `/monitor`, `/monitor retro`, `/vector`, `/experimental` |
 | UX | `/new-window` |
 
+## 현재 보유 기능 목록
+
+### 핵심 런타임
+- ACP(Agent Client Protocol) V1 호환 어댑터로 ACP 클라이언트와 stdio 기반으로 동작한다.
+- 멀티 백엔드 모드(`codex`, `claude-code`, `gemini`, `multi`)를 지원한다.
+- 멀티 모드에서는 세션 단위 라우팅과 `/backend <backend>` 동적 전환이 가능하다.
+
+### 세션 연속성 및 운영
+- 새 세션 생성, 이어가기, 포크(`fork`), 동기화/요약(`compact`), 되돌리기(`undo`)를 지원한다.
+- 세션/이벤트 로그를 Canonical 스토어에 영속화하고, 백엔드별 식별자 매핑을 통해 재로드를 지원한다.
+- 세션 진행은 `/status`, `/monitor`, `/monitor retro`, `/vector`, `/new-window`로 점검한다.
+
+### 승인/도구 실행 제어
+- 툴 호출 전 사용자 승인 흐름(`approvals`)과 이벤트(`permission`/`tool`/`plan`/`thought`) 로깅을 제공한다.
+- 위험 동작/명령에 대한 사전 확인이 가능한 실행 우선 정책을 유지한다.
+
+### 내장 명령어 커버리지
+- 핵심: `/setup`, `/model`, `/personality`, `/approvals`, `/permissions`, `/status`
+- 세션: `/new`, `/resume`, `/fork`, `/diff`, `/load`, `/sessions`, `/undo`, `/compact`
+- 운영/검토: `/feedback`, `/review`, `/review-branch`, `/review-commit`, `/init`, `/logout`
+- 통합: `/mcp`, `/skills`, `/mention`, `/vector`, `/monitor`, `/experimental`
+
+### 백엔드/외부 통합
+- `codex` 백엔드는 인증/세션/리스트/로드/모드·모델·옵션 제어가 포함된 완전 모드에 가깝다.
+- `claude-code`, `gemini` 백엔드는 CLI 연동형으로 동작하며 백엔드별 제약이 있는 경량 모드이다.
+- 커스텀 프롬프트(`prompts`) 로딩을 지원하고 `prompts:` 접두사 동적 명령을 사용할 수 있다.
+
+### 배포·개발 지원
+- `cargo build --release` 와 `cargo test` 가 기본 검증 라인이다.
+- `build_and_install.sh`, `acp_compat_smoke.sh`, `tag_release.sh`로 빌드/릴리스 운영 루틴이 갖춰져 있다.
+- `extension.toml` 기반 Zed 연동과 GitHub release binary 배포 채널을 유지한다.
+
+## Current Feature Inventory
+
+### Core runtime
+- Operates as an ACP (Agent Client Protocol) V1-compatible adapter over stdio.
+- Supports multi-backend execution (`codex`, `claude-code`, `gemini`, `multi`).
+- Allows in-session backend switching via `/backend <backend>` in multi mode.
+
+### Session continuity and operations
+- Supports creating, resuming, forking, compacting, and undoing sessions.
+- Persists session/event logs in canonical storage and remaps backend identifiers for reload.
+- Uses `/status`, `/monitor`, `/monitor retro`, `/vector`, and `/new-window` for runtime visibility.
+
+### Approval and tool execution control
+- Supports pre-execution approval flow and logs events such as permission, tool, plan, and thought updates.
+- Keeps risky actions gated by explicit user confirmation.
+
+### Built-in command coverage
+- Core: `/setup`, `/model`, `/personality`, `/approvals`, `/permissions`, `/status`
+- Session: `/new`, `/resume`, `/fork`, `/diff`, `/load`, `/sessions`, `/undo`, `/compact`
+- Review/ops: `/feedback`, `/review`, `/review-branch`, `/review-commit`, `/init`, `/logout`
+- Integrations: `/mcp`, `/skills`, `/mention`, `/vector`, `/monitor`, `/experimental`
+
+### Backend and external integration
+- `codex` is the most complete backend with authentication, session, model, mode, and option controls.
+- `claude-code` and `gemini` are CLI-bridged lightweight modes with different session capabilities.
+- Supports dynamic custom prompts through prompt loading and `prompts:` command prefixes.
+
+### Delivery and development support
+- Core verification commands remain: `cargo build --release` and `cargo test`.
+- Build/deploy scripts include `build_and_install.sh`, `acp_compat_smoke.sh`, and `tag_release.sh`.
+- Keeps Zed and GitHub release binary distribution aligned through `extension.toml` and release metadata.
+
+## Release Notes (3-line summary)
+
+### 한글
+1. ACP stdio 적응기 기반으로 멀티 백엔드 라우팅과 세션 연속성 로그를 제공합니다.
+2. 승인/도구 실행 가드와 핵심 `/setup /review /compact /undo /monitor /status` 계열 명령을 강화했습니다.
+3. Zed/ACP 배포 경로(확장 매니페스트·GitHub release binary)를 기반으로 릴리스/운영 루틴을 정비했습니다.
+
+### English
+1. Provides ACP stdio-first execution with multi-backend routing and persistent session continuity logs.
+2. Tightens approval-first tool execution with core workflow commands across setup, review, session, and monitoring.
+3. Aligns release and distribution flow with Zed extension manifests and GitHub release binaries.
+
 ## Client Integration
 
 ### Zed custom agent registration
@@ -103,27 +178,18 @@ Compatibility note:
 xsfire-camp acp
 ```
 
-If the extension resolves agents from PATH, expose command via npm:
+If the client resolves agents from `PATH`, install from the release binary and expose it directly:
 
 ```bash
-npm i -g @haegyung/xsfire-camp
+install -m 0755 target/release/xsfire-camp /usr/local/bin/xsfire-camp
 ```
 
-## npm Package
+## ACP Registry Notes
 
-```bash
-npx @haegyung/xsfire-camp
-```
-
-Package:
-- Base: `@haegyung/xsfire-camp`
-- Platform optional dependencies:
-  - `@haegyung/xsfire-camp-darwin-arm64`
-  - `@haegyung/xsfire-camp-darwin-x64`
-  - `@haegyung/xsfire-camp-linux-arm64`
-  - `@haegyung/xsfire-camp-linux-x64`
-  - `@haegyung/xsfire-camp-win32-arm64`
-  - `@haegyung/xsfire-camp-win32-x64`
+- The ACP registry entry installs `xsfire-camp` from GitHub release binaries, not from the npm package.
+- `codex` is the most complete backend for ACP use. It carries the full `xsfire-camp` auth/session/tool-plan flow.
+- `claude-code` and `gemini` are lightweight CLI bridges. Registry install only provides `xsfire-camp` itself; you still need the upstream CLI installed and authenticated on the local machine.
+- If your ACP client expects one self-contained agent binary with no extra local setup, prefer the `codex` backend.
 
 ## Troubleshooting (Top 5)
 
@@ -136,11 +202,11 @@ Package:
 3. Backend switch fails
 - Confirm target backend CLI (`claude`/`gemini`) is installed and authenticated.
 
-4. npm package not found
-- Check latest release workflow and npm publish auth (`NPM_TOKEN` secret, or trusted publishing via `NPM_OIDC_PUBLISH=true`/`1` and npm trusted publisher registration for scope `@haegyung` and repository `theprometheusxyz/xsfire-camp`).
+4. Legacy npm instructions still appear
+- `xsfire-camp` no longer ships through npm. Use the GitHub release binary or ACP registry entry instead.
 
-5. Zed community extension not visible yet
-- Registry PR may still be open or waiting for maintainer merge queue.
+5. ACP registry entry not visible yet
+- Check ACP registry PR/check status first (`agentclientprotocol/registry`), especially `action_required` workflows that need maintainer intervention. Keep registry PR comments in English and post only evidence-backed updates.
 
 ## Docs Index
 
@@ -160,14 +226,17 @@ Package:
 ### Quality and release
 - `docs/quality/verification_guidance.md`
 - `docs/quality/qa_checklist.md`
-- `docs/releases/release_notes_v0.9.8.md`
-- `docs/releases/release_notes_v0.9.10.md`
-- `docs/releases/release_notes_v0.9.11.md`
-- `docs/releases/release_notes_v0.9.12.md`
-- `docs/releases/release_notes_v0.9.13.md`
+- `docs/guides/github_registry_release_runbook.md`
+- `docs/releases/release_notes_v0.9.18.md`
+- `docs/releases/release_notes_v0.9.16.md`
 - `docs/releases/release_notes_v0.9.14.md`
+- `docs/releases/release_notes_v0.9.13.md`
+- `docs/releases/release_notes_v0.9.12.md`
+- `docs/releases/release_notes_v0.9.11.md`
+- `docs/releases/release_notes_v0.9.10.md`
+- `docs/releases/release_notes_v0.9.8.md`
 
-### Zed extension
+### ACP/Zed integration
 - `docs/zed/zed_extension_pr_template.md`
 - `docs/zed/extensions_toml_sample.md`
 - `docs/zed/install_shared_settings.md`
@@ -178,7 +247,7 @@ Package:
 2. Quick Start command flags still match binary behavior.
 3. Verification commands are still valid.
 4. `docs/` links are alive and accurate.
-5. npm and Zed registry status text is current.
+5. GitHub release binary and ACP registry status text is current.
 6. New release notes link is added.
 
 ## English Summary

@@ -15,17 +15,26 @@
 - [release_plan_v0.9.4.md](plans/release_plan_v0.9.4.md): 릴리즈 실행 계획
 
 ## releases/
-- [release_notes_v0.9.8.md](releases/release_notes_v0.9.8.md)
-- [release_notes_v0.9.10.md](releases/release_notes_v0.9.10.md)
-- [release_notes_v0.9.11.md](releases/release_notes_v0.9.11.md)
-- [release_notes_v0.9.12.md](releases/release_notes_v0.9.12.md)
-- [release_notes_v0.9.13.md](releases/release_notes_v0.9.13.md)
+- [release_notes_v0.9.18.md](releases/release_notes_v0.9.18.md)
+- [release_notes_v0.9.16.md](releases/release_notes_v0.9.16.md)
 - [release_notes_v0.9.14.md](releases/release_notes_v0.9.14.md)
+- [release_notes_v0.9.13.md](releases/release_notes_v0.9.13.md)
+- [release_notes_v0.9.12.md](releases/release_notes_v0.9.12.md)
+- [release_notes_v0.9.11.md](releases/release_notes_v0.9.11.md)
+- [release_notes_v0.9.10.md](releases/release_notes_v0.9.10.md)
+- [release_notes_v0.9.8.md](releases/release_notes_v0.9.8.md)
 
 ## quality/
 - [qa_checklist.md](quality/qa_checklist.md): QA 체크리스트
+- [iteration_fit_records.md](quality/iteration_fit_records.md): 이터레이션 X/X' 증빙 로그
 - [verification_guidance.md](quality/verification_guidance.md): 로컬/수동 검증 가이드
+- [cross_environment_execution_protocol.md](quality/cross_environment_execution_protocol.md): 환경독립 실행 규약(Rubric/Iteration/fit/X/X')
+- [iteration_fit_template.md](quality/iteration_fit_template.md): 반복 기록 템플릿
 - [serena_workflow.md](serena_workflow.md): Serena 기반 팀 작업 루프/품질 게이트 운영 가이드
+
+## guides/
+- [github_registry_release_runbook.md](guides/github_registry_release_runbook.md): GitHub 릴리즈/ACP 레지스트리 운영 정본 런북(레지스트리 코멘트 영문 규칙 포함)
+- [npm_publish_recovery.md](guides/npm_publish_recovery.md): (historical) npm 퍼블리시 실패 원인 기록
 
 ## reference/
 - [acp_standard_spec.md](reference/acp_standard_spec.md): ACP 표준 스펙과 xsfire-camp 기능 매핑
@@ -33,9 +42,9 @@
 - [event_handling.md](reference/event_handling.md): 이벤트 -> ACP 출력 매핑
 
 ## zed/
-- [extensions_toml_sample.md](zed/extensions_toml_sample.md): `extensions.toml` 샘플
+- [extensions_toml_sample.md](zed/extensions_toml_sample.md): (legacy) Zed marketplace `extensions.toml` 샘플
 - [install_shared_settings.md](zed/install_shared_settings.md): 공유 설정 설치 안내
-- [zed_extension_pr_template.md](zed/zed_extension_pr_template.md): Zed 확장 PR 템플릿
+- [zed_extension_pr_template.md](zed/zed_extension_pr_template.md): (legacy) Zed 확장 PR 템플릿
 
 ## design-system/
 - [README.md](design-system/README.md): Fluent 디자인 시스템 개요
