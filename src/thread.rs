@@ -3,8 +3,12 @@ use std::{
     collections::{HashMap, VecDeque},
     ops::DerefMut,
     path::{Path, PathBuf},
+    process::Command,
     rc::Rc,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        Arc, LazyLock, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -75,7 +79,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 use crate::{
-    ACP_CLIENT,
+    ACP_CLIENT, current_client_info,
     prompt_args::{expand_custom_prompt, parse_slash_name},
     session_store::SessionStore,
 };
@@ -110,6 +114,11 @@ const TOOL_CALL_WATCHDOG_SECONDS_DEFAULT: u64 = 90;
 const TOOL_CALL_WATCHDOG_SECONDS_MIN: u64 = 60;
 const TOOL_CALL_WATCHDOG_SECONDS_MAX: u64 = 120;
 const TOOL_CALL_WATCHDOG_TICK_SECONDS: u64 = 1;
+const DIAGNOSTICS_AUTO_LOG_ENV: &str = "ACP_DIAGNOSTICS_AUTO_LOG";
+const DIAGNOSTICS_LOG_EVERY_ENV: &str = "ACP_DIAGNOSTICS_LOG_EVERY";
+const DIAGNOSTICS_LOG_EVERY_DEFAULT: u64 = 50;
+const DIAGNOSTICS_LOG_EVERY_MIN: u64 = 5;
+const DIAGNOSTICS_LOG_EVERY_MAX: u64 = 5_000;
 
 #[derive(Clone, Debug)]
 struct SessionListEntry {
@@ -223,6 +232,131 @@ impl UiVisibilityMode {
     fn hides_internal_updates(self) -> bool {
         matches!(self, Self::FinalOnly)
     }
+
+    fn as_config_value(self) -> &'static str {
+        match self {
+            Self::Full => "full",
+            Self::FinalOnly => "final_only",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RuntimeDiagnosticsState {
+    started_at: Instant,
+    notifications_sent: AtomicU64,
+    notification_errors: AtomicU64,
+    user_message_chunks: AtomicU64,
+    user_message_chars: AtomicU64,
+    agent_message_chunks: AtomicU64,
+    agent_message_chars: AtomicU64,
+    agent_thought_chunks: AtomicU64,
+    agent_thought_chars: AtomicU64,
+    tool_calls: AtomicU64,
+    tool_call_payload_chars: AtomicU64,
+    tool_call_updates: AtomicU64,
+    tool_call_update_payload_chars: AtomicU64,
+    plan_updates: AtomicU64,
+    permission_requests: AtomicU64,
+    auto_log_notification_watermark: AtomicU64,
+}
+
+impl RuntimeDiagnosticsState {
+    fn new() -> Self {
+        Self {
+            started_at: Instant::now(),
+            notifications_sent: AtomicU64::new(0),
+            notification_errors: AtomicU64::new(0),
+            user_message_chunks: AtomicU64::new(0),
+            user_message_chars: AtomicU64::new(0),
+            agent_message_chunks: AtomicU64::new(0),
+            agent_message_chars: AtomicU64::new(0),
+            agent_thought_chunks: AtomicU64::new(0),
+            agent_thought_chars: AtomicU64::new(0),
+            tool_calls: AtomicU64::new(0),
+            tool_call_payload_chars: AtomicU64::new(0),
+            tool_call_updates: AtomicU64::new(0),
+            tool_call_update_payload_chars: AtomicU64::new(0),
+            plan_updates: AtomicU64::new(0),
+            permission_requests: AtomicU64::new(0),
+            auto_log_notification_watermark: AtomicU64::new(0),
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+struct RuntimeDiagnosticsSnapshot {
+    reason: String,
+    client_info: Option<String>,
+    ui_visibility_mode: String,
+    uptime_secs: u64,
+    active_tasks: usize,
+    notifications_sent: u64,
+    notification_errors: u64,
+    current_rss_bytes: Option<u64>,
+    user_message_chunks: u64,
+    user_message_chars: u64,
+    agent_message_chunks: u64,
+    agent_message_chars: u64,
+    agent_thought_chunks: u64,
+    agent_thought_chars: u64,
+    tool_calls: u64,
+    tool_call_payload_chars: u64,
+    tool_call_updates: u64,
+    tool_call_update_payload_chars: u64,
+    plan_updates: u64,
+    permission_requests: u64,
+}
+
+impl RuntimeDiagnosticsSnapshot {
+    fn total_payload_chars(&self) -> u64 {
+        self.user_message_chars
+            + self.agent_message_chars
+            + self.agent_thought_chars
+            + self.tool_call_payload_chars
+            + self.tool_call_update_payload_chars
+    }
+
+    fn render(&self) -> String {
+        let current_rss = self
+            .current_rss_bytes
+            .map(format_bytes)
+            .unwrap_or_else(|| "unavailable".to_string());
+        let client_info = self.client_info.as_deref().unwrap_or("unknown");
+        let lines = vec![
+            format!(
+                "ACP client: {client_info} | visibility={} | uptime={}s | active_tasks={}",
+                self.ui_visibility_mode, self.uptime_secs, self.active_tasks
+            ),
+            format!(
+                "Process RSS: {current_rss} | notifications_sent={} | notification_errors={}",
+                self.notifications_sent, self.notification_errors
+            ),
+            format!(
+                "User chunks: {} ({}), agent text chunks: {} ({})",
+                self.user_message_chunks,
+                format_bytes(self.user_message_chars),
+                self.agent_message_chunks,
+                format_bytes(self.agent_message_chars)
+            ),
+            format!(
+                "Thought chunks: {} ({}), tool calls: {} ({}), tool updates: {} ({})",
+                self.agent_thought_chunks,
+                format_bytes(self.agent_thought_chars),
+                self.tool_calls,
+                format_bytes(self.tool_call_payload_chars),
+                self.tool_call_updates,
+                format_bytes(self.tool_call_update_payload_chars)
+            ),
+            format!(
+                "Plan updates: {} | permission requests: {} | total tracked payload={}",
+                self.plan_updates,
+                self.permission_requests,
+                format_bytes(self.total_payload_chars())
+            ),
+        ];
+        lines.join("\n")
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -322,6 +456,76 @@ fn parse_bounded_usize_env(var_name: &str, default: usize, min: usize, max: usiz
         .and_then(|raw| raw.trim().parse::<usize>().ok())
         .unwrap_or(default)
         .clamp(min, max)
+}
+
+fn parse_bounded_u64_env(var_name: &str, default: u64, min: u64, max: u64) -> u64 {
+    std::env::var(var_name)
+        .ok()
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .unwrap_or(default)
+        .clamp(min, max)
+}
+
+fn diagnostics_auto_log_enabled_from_env() -> bool {
+    std::env::var(DIAGNOSTICS_AUTO_LOG_ENV)
+        .ok()
+        .as_deref()
+        .and_then(parse_on_off_env)
+        .unwrap_or(false)
+}
+
+fn diagnostics_log_every_from_env() -> u64 {
+    parse_bounded_u64_env(
+        DIAGNOSTICS_LOG_EVERY_ENV,
+        DIAGNOSTICS_LOG_EVERY_DEFAULT,
+        DIAGNOSTICS_LOG_EVERY_MIN,
+        DIAGNOSTICS_LOG_EVERY_MAX,
+    )
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = KIB * 1024.0;
+    const GIB: f64 = MIB * 1024.0;
+
+    let bytes_f64 = bytes as f64;
+    if bytes_f64 >= GIB {
+        format!("{:.2} GiB", bytes_f64 / GIB)
+    } else if bytes_f64 >= MIB {
+        format!("{:.2} MiB", bytes_f64 / MIB)
+    } else if bytes_f64 >= KIB {
+        format!("{:.2} KiB", bytes_f64 / KIB)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn current_process_rss_bytes() -> Option<u64> {
+    #[cfg(unix)]
+    {
+        let pid = std::process::id().to_string();
+        let output = Command::new("ps")
+            .args(["-o", "rss=", "-p", &pid])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let stdout = String::from_utf8(output.stdout).ok()?;
+        let rss_kib = stdout.trim().parse::<u64>().ok()?;
+        return Some(rss_kib.saturating_mul(1024));
+    }
+
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+fn json_payload_chars(value: &serde_json::Value) -> u64 {
+    serde_json::to_string(value)
+        .map(|s| s.chars().count() as u64)
+        .unwrap_or_default()
 }
 
 fn ui_text_chunk_max_chars_from_env() -> usize {
@@ -2809,6 +3013,7 @@ struct SessionClient {
     client_capabilities: Arc<Mutex<ClientCapabilities>>,
     session_store: Option<SessionStore>,
     ui_visibility_mode: UiVisibilityMode,
+    diagnostics: Arc<RuntimeDiagnosticsState>,
 }
 
 impl SessionClient {
@@ -2823,6 +3028,7 @@ impl SessionClient {
             client_capabilities,
             session_store,
             ui_visibility_mode: UiVisibilityMode::from_env(),
+            diagnostics: Arc::new(RuntimeDiagnosticsState::new()),
         }
     }
 
@@ -2839,6 +3045,7 @@ impl SessionClient {
             client_capabilities,
             session_store,
             ui_visibility_mode: UiVisibilityMode::from_env(),
+            diagnostics: Arc::new(RuntimeDiagnosticsState::new()),
         }
     }
 
@@ -2856,6 +3063,90 @@ impl SessionClient {
         self.ui_visibility_mode.hides_internal_updates()
     }
 
+    fn runtime_diagnostics_snapshot(
+        &self,
+        reason: impl Into<String>,
+        active_tasks: usize,
+    ) -> RuntimeDiagnosticsSnapshot {
+        RuntimeDiagnosticsSnapshot {
+            reason: reason.into(),
+            client_info: current_client_info(),
+            ui_visibility_mode: self.ui_visibility_mode.as_config_value().to_string(),
+            uptime_secs: self.diagnostics.started_at.elapsed().as_secs(),
+            active_tasks,
+            notifications_sent: self.diagnostics.notifications_sent.load(Ordering::Relaxed),
+            notification_errors: self.diagnostics.notification_errors.load(Ordering::Relaxed),
+            current_rss_bytes: current_process_rss_bytes(),
+            user_message_chunks: self.diagnostics.user_message_chunks.load(Ordering::Relaxed),
+            user_message_chars: self.diagnostics.user_message_chars.load(Ordering::Relaxed),
+            agent_message_chunks: self
+                .diagnostics
+                .agent_message_chunks
+                .load(Ordering::Relaxed),
+            agent_message_chars: self.diagnostics.agent_message_chars.load(Ordering::Relaxed),
+            agent_thought_chunks: self
+                .diagnostics
+                .agent_thought_chunks
+                .load(Ordering::Relaxed),
+            agent_thought_chars: self.diagnostics.agent_thought_chars.load(Ordering::Relaxed),
+            tool_calls: self.diagnostics.tool_calls.load(Ordering::Relaxed),
+            tool_call_payload_chars: self
+                .diagnostics
+                .tool_call_payload_chars
+                .load(Ordering::Relaxed),
+            tool_call_updates: self.diagnostics.tool_call_updates.load(Ordering::Relaxed),
+            tool_call_update_payload_chars: self
+                .diagnostics
+                .tool_call_update_payload_chars
+                .load(Ordering::Relaxed),
+            plan_updates: self.diagnostics.plan_updates.load(Ordering::Relaxed),
+            permission_requests: self.diagnostics.permission_requests.load(Ordering::Relaxed),
+        }
+    }
+
+    fn log_runtime_diagnostics(&self, reason: impl Into<String>, active_tasks: usize) {
+        let snapshot = self.runtime_diagnostics_snapshot(reason, active_tasks);
+        let value = serde_json::to_value(snapshot).unwrap_or_else(|_| {
+            json!({
+                "reason": "serialize_failed"
+            })
+        });
+        self.log_canonical("acp.runtime_diagnostics", value);
+    }
+
+    fn maybe_log_runtime_diagnostics(&self, trigger: &str) {
+        if !diagnostics_auto_log_enabled_from_env() {
+            return;
+        }
+
+        let every = diagnostics_log_every_from_env();
+        let notifications = self.diagnostics.notifications_sent.load(Ordering::Relaxed);
+        if notifications < every {
+            return;
+        }
+
+        let watermark = (notifications / every) * every;
+        let previous = self
+            .diagnostics
+            .auto_log_notification_watermark
+            .load(Ordering::Relaxed);
+        if watermark <= previous {
+            return;
+        }
+
+        if self
+            .diagnostics
+            .auto_log_notification_watermark
+            .compare_exchange(previous, watermark, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            self.log_runtime_diagnostics(
+                format!("auto_notification_threshold:{trigger}:{watermark}"),
+                0,
+            );
+        }
+    }
+
     fn supports_terminal_output(&self, active_command: &ActiveCommand) -> bool {
         active_command.terminal_output
             && self
@@ -2871,17 +3162,30 @@ impl SessionClient {
     }
 
     async fn send_notification(&self, update: SessionUpdate) {
+        self.diagnostics
+            .notifications_sent
+            .fetch_add(1, Ordering::Relaxed);
         if let Err(e) = self
             .client
             .session_notification(SessionNotification::new(self.session_id.clone(), update))
             .await
         {
+            self.diagnostics
+                .notification_errors
+                .fetch_add(1, Ordering::Relaxed);
             error!("Failed to send session notification: {:?}", e);
         }
+        self.maybe_log_runtime_diagnostics("session_update");
     }
 
     async fn send_user_message(&self, text: impl Into<String>) {
         let text = text.into();
+        self.diagnostics
+            .user_message_chunks
+            .fetch_add(1, Ordering::Relaxed);
+        self.diagnostics
+            .user_message_chars
+            .fetch_add(text.chars().count() as u64, Ordering::Relaxed);
         self.log_canonical("acp.user_message_chunk", json!({ "text": text }));
         self.send_notification(SessionUpdate::UserMessageChunk(ContentChunk::new(
             text.into(),
@@ -2893,6 +3197,12 @@ impl SessionClient {
         let text = text.into();
         let max_chars = ui_text_chunk_max_chars_from_env();
         for chunk in split_text_for_ui_chunks(&text, max_chars) {
+            self.diagnostics
+                .agent_message_chunks
+                .fetch_add(1, Ordering::Relaxed);
+            self.diagnostics
+                .agent_message_chars
+                .fetch_add(chunk.chars().count() as u64, Ordering::Relaxed);
             self.log_canonical("acp.agent_message_chunk", json!({ "text": &chunk }));
             self.send_notification(SessionUpdate::AgentMessageChunk(ContentChunk::new(
                 chunk.into(),
@@ -2903,6 +3213,12 @@ impl SessionClient {
 
     async fn send_agent_thought(&self, text: impl Into<String>) {
         let text = text.into();
+        self.diagnostics
+            .agent_thought_chunks
+            .fetch_add(1, Ordering::Relaxed);
+        self.diagnostics
+            .agent_thought_chars
+            .fetch_add(text.chars().count() as u64, Ordering::Relaxed);
         self.log_canonical("acp.agent_thought_chunk", json!({ "text": text }));
         if self.hides_internal_updates() {
             return;
@@ -2920,6 +3236,10 @@ impl SessionClient {
                 "debug": format!("{tool_call:?}")
             })
         });
+        self.diagnostics.tool_calls.fetch_add(1, Ordering::Relaxed);
+        self.diagnostics
+            .tool_call_payload_chars
+            .fetch_add(json_payload_chars(&value), Ordering::Relaxed);
         self.log_canonical("acp.tool_call", value);
         if self.hides_internal_updates() {
             return;
@@ -2935,6 +3255,12 @@ impl SessionClient {
                 "debug": format!("{update:?}")
             })
         });
+        self.diagnostics
+            .tool_call_updates
+            .fetch_add(1, Ordering::Relaxed);
+        self.diagnostics
+            .tool_call_update_payload_chars
+            .fetch_add(json_payload_chars(&value), Ordering::Relaxed);
         self.log_canonical("acp.tool_call_update", value);
         if self.hides_internal_updates() {
             return;
@@ -2990,6 +3316,9 @@ impl SessionClient {
         if let Some(explanation) = explanation {
             data["explanation"] = serde_json::Value::String(explanation);
         }
+        self.diagnostics
+            .plan_updates
+            .fetch_add(1, Ordering::Relaxed);
         self.log_canonical("acp.plan", data);
         if self.hides_internal_updates() {
             return;
@@ -3017,6 +3346,9 @@ impl SessionClient {
         tool_call: ToolCallUpdate,
         options: Vec<PermissionOption>,
     ) -> Result<RequestPermissionResponse, Error> {
+        self.diagnostics
+            .permission_requests
+            .fetch_add(1, Ordering::Relaxed);
         self.log_canonical(
             "acp.request_permission",
             json!({
@@ -4580,7 +4912,9 @@ impl<A: Auth> ThreadActor<A> {
         ));
         lines.push(String::new());
         lines.push("Monitor thread (meta lane, pinned)".to_string());
-        lines.push("Pinned panels: context telemetry | flow telemetry".to_string());
+        lines.push(
+            "Pinned panels: context telemetry | flow telemetry | runtime diagnostics".to_string(),
+        );
         lines.push("Panel: Context telemetry".to_string());
         lines.push(String::new());
         lines.push(monitor_fit_line(
@@ -4655,6 +4989,18 @@ impl<A: Auth> ThreadActor<A> {
             &format!("Flow minimap: {}", self.flow_vector.path_string()),
             panel_width,
         ));
+
+        if detail {
+            let diagnostics = self
+                .client
+                .runtime_diagnostics_snapshot("monitor_detail", active_task_count);
+            self.client
+                .log_runtime_diagnostics("monitor_detail", active_task_count);
+            lines.push(String::new());
+            lines.push("Panel: Runtime diagnostics".to_string());
+            lines.push(String::new());
+            lines.extend(monitor_fit_block(&diagnostics.render(), panel_width));
+        }
 
         lines.join("\n")
     }
@@ -6958,6 +7304,270 @@ mod tests {
             ops.is_empty(),
             "monitor command should not submit backend op"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monitor_detail_command_includes_runtime_diagnostics() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        crate::record_client_info(Some("zed@diagnostics-test".to_string()));
+        let (session_id, client, _thread, message_tx, local_set) = setup(vec![]).await?;
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/monitor detail".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let notifications = client.notifications.lock().unwrap();
+        let monitor_text = notifications
+            .iter()
+            .filter_map(|n| match &n.update {
+                SessionUpdate::AgentMessageChunk(ContentChunk {
+                    content: ContentBlock::Text(TextContent { text, .. }),
+                    ..
+                }) if text.contains("Thread monitor") => Some(text.as_str()),
+                _ => None,
+            })
+            .next_back()
+            .expect("expected /monitor detail output");
+
+        assert!(
+            monitor_text.contains("Panel: Runtime diagnostics"),
+            "monitor detail should include runtime diagnostics panel. notifications={notifications:?}"
+        );
+        assert!(
+            monitor_text.contains("Process RSS:"),
+            "monitor detail should include process RSS line. notifications={notifications:?}"
+        );
+        assert!(
+            monitor_text.contains("ACP client: zed@diagnostics-test"),
+            "monitor detail should include captured client info. notifications={notifications:?}"
+        );
+
+        crate::record_client_info(None);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_monitor_detail_logs_runtime_diagnostics_to_canonical_log() -> anyhow::Result<()> {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        let root = std::env::temp_dir().join(format!("acp-monitor-detail-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root)?;
+
+        unsafe {
+            std::env::set_var("ACP_HOME", &root);
+        }
+        crate::record_client_info(Some("zed@canonical-log-test".to_string()));
+
+        let mut idx = crate::session_store::GlobalSessionIndex::load()
+            .expect("ACP_HOME should be resolvable");
+        let global_id = idx.get_or_create("codex:test-monitor-detail").unwrap();
+        let store = crate::session_store::SessionStore::init(
+            global_id.clone(),
+            "codex",
+            "acp-session-id",
+            "backend-session-id",
+            Some(Path::new("/tmp/repo")),
+        )
+        .expect("SessionStore should init");
+
+        let session_id = SessionId::new("test-monitor-detail");
+        let client = Arc::new(StubClient::new());
+        let session_client =
+            SessionClient::with_client(session_id.clone(), client, Arc::default(), Some(store));
+        let conversation = Arc::new(StubCodexThread::new());
+        let models_manager = Arc::new(StubModelsManager);
+        let config = Config::load_with_cli_overrides_and_harness_overrides(
+            vec![],
+            ConfigOverrides::default(),
+        )
+        .await?;
+        let (message_tx, message_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let actor = ThreadActor::new(
+            StubAuth,
+            session_client,
+            conversation,
+            models_manager,
+            config,
+            message_rx,
+        );
+
+        let local_set = LocalSet::new();
+        local_set.spawn_local(actor.spawn());
+
+        let (prompt_response_tx, prompt_response_rx) = tokio::sync::oneshot::channel();
+        message_tx.send(ThreadMessage::Prompt {
+            request: PromptRequest::new(session_id.clone(), vec!["/monitor detail".into()]),
+            response_tx: prompt_response_tx,
+        })?;
+
+        tokio::try_join!(
+            async {
+                let stop_reason = prompt_response_rx.await??.await??;
+                assert_eq!(stop_reason, StopReason::EndTurn);
+                drop(message_tx);
+                anyhow::Ok(())
+            },
+            async {
+                local_set.await;
+                anyhow::Ok(())
+            }
+        )?;
+
+        let canonical_path = root
+            .join("sessions")
+            .join(&global_id)
+            .join("canonical.jsonl");
+        let lines = std::fs::read_to_string(&canonical_path)?;
+        let diagnostic_event = lines
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .find(|value| {
+                value.get("kind").and_then(|kind| kind.as_str()) == Some("acp.runtime_diagnostics")
+            })
+            .expect("expected acp.runtime_diagnostics canonical event");
+
+        assert_eq!(
+            diagnostic_event
+                .pointer("/data/reason")
+                .and_then(|v| v.as_str()),
+            Some("monitor_detail")
+        );
+        assert_eq!(
+            diagnostic_event
+                .pointer("/data/client_info")
+                .and_then(|v| v.as_str()),
+            Some("zed@canonical-log-test")
+        );
+        assert_eq!(
+            diagnostic_event
+                .pointer("/data/ui_visibility_mode")
+                .and_then(|v| v.as_str()),
+            Some("full")
+        );
+        assert!(
+            diagnostic_event
+                .pointer("/data/current_rss_bytes")
+                .is_some(),
+            "runtime diagnostics event should include rss field: {diagnostic_event:?}"
+        );
+
+        crate::record_client_info(None);
+        drop(std::fs::remove_dir_all(&root));
+        unsafe {
+            std::env::remove_var("ACP_HOME");
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_auto_runtime_diagnostics_logging_at_notification_threshold() -> anyhow::Result<()>
+    {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        let root =
+            std::env::temp_dir().join(format!("acp-auto-diagnostics-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root)?;
+
+        let _auto_restore = EnvVarRestore::set(DIAGNOSTICS_AUTO_LOG_ENV, Some("on"));
+        let _every_restore = EnvVarRestore::set(DIAGNOSTICS_LOG_EVERY_ENV, Some("5"));
+        unsafe {
+            std::env::set_var("ACP_HOME", &root);
+        }
+        crate::record_client_info(Some("zed@auto-log-test".to_string()));
+
+        let mut idx = crate::session_store::GlobalSessionIndex::load()
+            .expect("ACP_HOME should be resolvable");
+        let global_id = idx
+            .get_or_create("codex:test-auto-runtime-diagnostics")
+            .unwrap();
+        let store = crate::session_store::SessionStore::init(
+            global_id.clone(),
+            "codex",
+            "acp-session-id",
+            "backend-session-id",
+            Some(Path::new("/tmp/repo")),
+        )
+        .expect("SessionStore should init");
+
+        let session_client = SessionClient::with_client(
+            SessionId::new("auto-runtime-diagnostics"),
+            Arc::new(StubClient::new()),
+            Arc::default(),
+            Some(store),
+        );
+
+        assert!(diagnostics_auto_log_enabled_from_env());
+        assert_eq!(diagnostics_log_every_from_env(), 5);
+        session_client
+            .diagnostics
+            .notifications_sent
+            .store(5, Ordering::Relaxed);
+        session_client.maybe_log_runtime_diagnostics("unit_test");
+        drop(session_client);
+
+        let canonical_path = root
+            .join("sessions")
+            .join(&global_id)
+            .join("canonical.jsonl");
+        let lines = std::fs::read_to_string(&canonical_path)?;
+        let diagnostic_event = lines
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .find(|value| {
+                value.get("kind").and_then(|kind| kind.as_str()) == Some("acp.runtime_diagnostics")
+            });
+        assert!(
+            diagnostic_event.is_some(),
+            "expected auto acp.runtime_diagnostics canonical event. canonical={lines}"
+        );
+        let diagnostic_event = diagnostic_event.unwrap();
+
+        let reason = diagnostic_event
+            .pointer("/data/reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            reason.starts_with("auto_notification_threshold:unit_test:5"),
+            "unexpected auto diagnostics reason: {reason}"
+        );
+
+        crate::record_client_info(None);
+        drop(std::fs::remove_dir_all(&root));
+        unsafe {
+            std::env::remove_var("ACP_HOME");
+        }
 
         Ok(())
     }

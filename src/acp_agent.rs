@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tracing::debug;
 
-use crate::backend::BackendDriver;
+use crate::{backend::BackendDriver, record_client_info};
 
 pub struct AcpAgent {
     driver: Rc<dyn BackendDriver>,
@@ -36,13 +36,14 @@ impl Agent for AcpAgent {
         let InitializeRequest {
             protocol_version,
             client_capabilities,
-            client_info: _, // TODO: save and pass into backend somehow
+            client_info,
             ..
         } = request;
         debug!("Received initialize request with protocol version {protocol_version:?}",);
         let protocol_version = ProtocolVersion::V1;
 
         *self.client_capabilities.lock().unwrap() = client_capabilities;
+        record_client_info(client_info.map(|info| format!("{info:?}")));
 
         let load_session = self.driver.supports_load_session();
         let mut agent_capabilities = AgentCapabilities::new()

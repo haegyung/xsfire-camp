@@ -25,11 +25,24 @@ mod session_store;
 mod thread;
 
 pub static ACP_CLIENT: OnceLock<Arc<AgentSideConnection>> = OnceLock::new();
+static ACP_CLIENT_INFO: OnceLock<Arc<Mutex<Option<String>>>> = OnceLock::new();
 static SESSION_ALIASES: OnceLock<Arc<Mutex<HashMap<String, agent_client_protocol::SessionId>>>> =
     OnceLock::new();
 
+fn acp_client_info() -> &'static Arc<Mutex<Option<String>>> {
+    ACP_CLIENT_INFO.get_or_init(|| Arc::new(Mutex::new(None)))
+}
+
 fn session_aliases() -> &'static Arc<Mutex<HashMap<String, agent_client_protocol::SessionId>>> {
     SESSION_ALIASES.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+}
+
+pub fn record_client_info(client_info: Option<String>) {
+    *acp_client_info().lock().unwrap() = client_info;
+}
+
+pub fn current_client_info() -> Option<String> {
+    acp_client_info().lock().unwrap().clone()
 }
 
 pub fn register_session_alias(
