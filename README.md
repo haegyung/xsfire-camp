@@ -227,8 +227,14 @@ install -m 0755 target/release/xsfire-camp /usr/local/bin/xsfire-camp
 - `docs/quality/verification_guidance.md`
 - `docs/quality/qa_checklist.md`
 - `docs/guides/github_registry_release_runbook.md`
+- `docs/releases/release_notes_v0.9.22.md`
+- `docs/releases/release_notes_v0.9.21.md`
+- `docs/releases/release_notes_v0.9.20.md`
+- `docs/releases/release_notes_v0.9.19.md`
 - `docs/releases/release_notes_v0.9.18.md`
+- `docs/releases/release_notes_v0.9.17.md`
 - `docs/releases/release_notes_v0.9.16.md`
+- `docs/releases/release_notes_v0.9.15.md`
 - `docs/releases/release_notes_v0.9.14.md`
 - `docs/releases/release_notes_v0.9.13.md`
 - `docs/releases/release_notes_v0.9.12.md`

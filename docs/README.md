@@ -15,8 +15,14 @@
 - [release_plan_v0.9.4.md](plans/release_plan_v0.9.4.md): 릴리즈 실행 계획
 
 ## releases/
+- [release_notes_v0.9.22.md](releases/release_notes_v0.9.22.md)
+- [release_notes_v0.9.21.md](releases/release_notes_v0.9.21.md)
+- [release_notes_v0.9.20.md](releases/release_notes_v0.9.20.md)
+- [release_notes_v0.9.19.md](releases/release_notes_v0.9.19.md)
 - [release_notes_v0.9.18.md](releases/release_notes_v0.9.18.md)
+- [release_notes_v0.9.17.md](releases/release_notes_v0.9.17.md)
 - [release_notes_v0.9.16.md](releases/release_notes_v0.9.16.md)
+- [release_notes_v0.9.15.md](releases/release_notes_v0.9.15.md)
 - [release_notes_v0.9.14.md](releases/release_notes_v0.9.14.md)
 - [release_notes_v0.9.13.md](releases/release_notes_v0.9.13.md)
 - [release_notes_v0.9.12.md](releases/release_notes_v0.9.12.md)
@@ -26,10 +32,7 @@
 
 ## quality/
 - [qa_checklist.md](quality/qa_checklist.md): QA 체크리스트
-- [iteration_fit_records.md](quality/iteration_fit_records.md): 이터레이션 X/X' 증빙 로그
 - [verification_guidance.md](quality/verification_guidance.md): 로컬/수동 검증 가이드
-- [cross_environment_execution_protocol.md](quality/cross_environment_execution_protocol.md): 환경독립 실행 규약(Rubric/Iteration/fit/X/X')
-- [iteration_fit_template.md](quality/iteration_fit_template.md): 반복 기록 템플릿
 - [serena_workflow.md](serena_workflow.md): Serena 기반 팀 작업 루프/품질 게이트 운영 가이드
 
 ## guides/

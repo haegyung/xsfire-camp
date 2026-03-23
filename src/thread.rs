@@ -3040,12 +3040,29 @@ impl SessionClient {
         client_capabilities: Arc<Mutex<ClientCapabilities>>,
         session_store: Option<SessionStore>,
     ) -> Self {
+        Self::with_client_and_visibility(
+            session_id,
+            client,
+            client_capabilities,
+            session_store,
+            UiVisibilityMode::from_env(),
+        )
+    }
+
+    #[cfg(test)]
+    fn with_client_and_visibility(
+        session_id: SessionId,
+        client: Arc<dyn Client>,
+        client_capabilities: Arc<Mutex<ClientCapabilities>>,
+        session_store: Option<SessionStore>,
+        ui_visibility_mode: UiVisibilityMode,
+    ) -> Self {
         Self {
             session_id,
             client,
             client_capabilities,
             session_store,
-            ui_visibility_mode: UiVisibilityMode::from_env(),
+            ui_visibility_mode,
             diagnostics: Arc::new(RuntimeDiagnosticsState::new()),
         }
     }
@@ -9700,8 +9717,13 @@ mod tests {
     )> {
         let session_id = SessionId::new("test");
         let client = Arc::new(StubClient::new());
-        let session_client =
-            SessionClient::with_client(session_id.clone(), client.clone(), Arc::default(), None);
+        let session_client = SessionClient::with_client_and_visibility(
+            session_id.clone(),
+            client.clone(),
+            Arc::default(),
+            None,
+            UiVisibilityMode::Full,
+        );
         let conversation = Arc::new(StubCodexThread::new());
         let models_manager = Arc::new(StubModelsManager);
         let config = Config::load_with_cli_overrides_and_harness_overrides(
