@@ -32,17 +32,18 @@
 - Tag: `v0.9.23`
 - GitHub Release: `https://github.com/theprometheusxyz/xsfire-camp/releases/tag/v0.9.23`
 
-## Post-Release Verification Snapshot (2026-03-24T02:26:27Z)
+## Post-Release Verification Snapshot (2026-03-24T02:37:29Z)
 
 - Product release workflow:
   - Run `23447088552` (`Release`, branch `v0.9.23`) completed with `success`.
   - URL: `https://github.com/theprometheusxyz/xsfire-camp/actions/runs/23447088552`
 - ACP registry PR:
-  - PR `#93` is `OPEN` with `mergeStateStatus=BLOCKED`.
+  - PR `#93` head is updated to commit `52cf9d6` (`v0.9.23` entry), and state remains `OPEN` with `mergeStateStatus=BLOCKED`.
   - URL: `https://github.com/agentclientprotocol/registry/pull/93`
 - ACP registry checks:
   - `gh pr checks 93 --repo agentclientprotocol/registry` currently reports: `no checks reported on the 'add-xsfire-camp-agent' branch`.
-  - Latest `Build Registry` run `23401346990` is `action_required`: `https://github.com/agentclientprotocol/registry/actions/runs/23401346990`
+  - Latest `Build Registry` run `23470404308` is `action_required`: `https://github.com/agentclientprotocol/registry/actions/runs/23470404308`
+  - Maintainer re-run request comment: `https://github.com/agentclientprotocol/registry/pull/93#issuecomment-4114976120`
 - Release asset integrity:
   - All 8 release archives matched expected SHA256 values.
   - Archive integrity checks passed for all 8 assets (`tar -tzf` / `unzip -tqq`).

@@ -18,16 +18,18 @@ Purpose: provide one canonical operational flow for GitHub release checks, ACP r
 4. Record outcome in release notes/checklists.
 
 ## Current State Snapshot
-- Snapshot time (UTC): `2026-03-24T02:26:27Z`.
+- Snapshot time (UTC): `2026-03-24T02:37:29Z`.
 - Latest product release target is `v0.9.23`.
 - `v0.9.23` GitHub release is published (`draft=false`, `prerelease=false`):
   - `https://github.com/theprometheusxyz/xsfire-camp/releases/tag/v0.9.23`
 - Latest product `Release` workflow run is `23447088552` on branch `v0.9.23` with `conclusion=success`:
   - `https://github.com/theprometheusxyz/xsfire-camp/actions/runs/23447088552`
-- ACP registry PR `#93` is `OPEN` with `mergeStateStatus=BLOCKED`:
+- ACP registry PR `#93` is `OPEN` with `mergeStateStatus=BLOCKED` on head `52cf9d6` (`v0.9.23` entry update):
   - `https://github.com/agentclientprotocol/registry/pull/93`
-- Latest ACP `Build Registry` run on branch `add-xsfire-camp-agent` is `23401346990` with `conclusion=action_required`, and `gh pr checks` reports no checks:
-  - `https://github.com/agentclientprotocol/registry/actions/runs/23401346990`
+- Latest ACP `Build Registry` run on branch `add-xsfire-camp-agent` is `23470404308` with `conclusion=action_required`, and `gh pr checks` reports no checks:
+  - `https://github.com/agentclientprotocol/registry/actions/runs/23470404308`
+- Latest maintainer-request comment:
+  - `https://github.com/agentclientprotocol/registry/pull/93#issuecomment-4114976120`
 
 ## Verification Commands
 ```bash
@@ -41,7 +43,7 @@ gh pr checks 93 --repo agentclientprotocol/registry
 
 # 3) If a specific registry workflow run is blocked/action_required
 gh run list --repo agentclientprotocol/registry --branch add-xsfire-camp-agent --limit 5 --json databaseId,workflowName,status,conclusion,url,createdAt
-gh run view 23401346990 --repo agentclientprotocol/registry
+gh run view 23470404308 --repo agentclientprotocol/registry
 ```
 
 ## Blocker Handling
