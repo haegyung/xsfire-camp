@@ -115,6 +115,30 @@ impl GeminiCliDriver {
         std::env::var("XSFIRE_GEMINI_MODEL").ok()
     }
 
+    fn help_text() -> String {
+        format!(
+            "Gemini commands:\n- /status\n- /model <name>\n- /reset\n\n{}",
+            BackendKind::Gemini
+                .work_orchestration_profile()
+                .render_summary(),
+        )
+    }
+
+    fn status_text(model: &str, history_turns: usize) -> String {
+        let profile = BackendKind::Gemini.work_orchestration_profile();
+        format!(
+            "Gemini session status:\n- model: {model}\n- history_turns: {history_turns}\n- task_orchestration: {}\n- task_monitoring: {}\n- progress_vector_checks: {}\n- preempt_on_new_prompt: {}\n- acp_bridge: {}\n- work_orchestration_sequence: {} ({})\n- operator_hint: {}",
+            profile.task_orchestration,
+            profile.task_monitoring,
+            profile.vector_checks_value(),
+            profile.preempt_value(),
+            profile.bridge_summary(),
+            crate::backend::WorkOrchestrationProfile::SEQUENCE,
+            crate::backend::WorkOrchestrationProfile::GLOSSARY,
+            profile.operator_hint,
+        )
+    }
+
     fn validate_auth_method(method_id: &str) -> Result<(), Error> {
         if method_id == Self::AUTH_METHOD_ID {
             return Ok(());
@@ -587,15 +611,10 @@ impl BackendDriver for GeminiCliDriver {
                     return Err(Error::resource_not_found(None));
                 };
                 match command {
-                    GeminiCommand::Help => {
-                        "Gemini commands:\n- /status\n- /model <name>\n- /reset".to_string()
-                    }
+                    GeminiCommand::Help => Self::help_text(),
                     GeminiCommand::Status => {
                         let model = session.model.as_deref().unwrap_or("default");
-                        format!(
-                            "Gemini session status:\n- model: {model}\n- history_turns: {}",
-                            session.history.len()
-                        )
+                        Self::status_text(model, session.history.len())
                     }
                     GeminiCommand::Reset => {
                         session.history.clear();
@@ -1282,5 +1301,26 @@ printf '%s\n' 'fake gemini output'
             .unwrap_err();
         let message = error_message(&error);
         assert!(message.contains("unsupported config option for gemini backend"));
+    }
+
+    #[test]
+    fn gemini_help_text_exposes_work_orchestration_profile() {
+        let help = GeminiCliDriver::help_text();
+        assert!(help.contains("Gemini commands:"));
+        assert!(help.contains("Work orchestration profile: Gemini CLI"));
+        assert!(help.contains("Goal/Rubric/Next Action"));
+        assert!(help.contains("single ACP message chunk only"));
+    }
+
+    #[test]
+    fn gemini_status_text_exposes_sequential_profile_defaults() {
+        let status = GeminiCliDriver::status_text("gemini-2.5-pro", 3);
+        assert!(status.contains("- model: gemini-2.5-pro"));
+        assert!(status.contains("- history_turns: 3"));
+        assert!(status.contains("- task_orchestration: sequential"));
+        assert!(status.contains("- task_monitoring: status-only"));
+        assert!(status.contains("- progress_vector_checks: off"));
+        assert!(status.contains("- preempt_on_new_prompt: off"));
+        assert!(status.contains("- work_orchestration_sequence: R->P->M->W->A"));
     }
 }

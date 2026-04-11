@@ -79,6 +79,30 @@ impl ClaudeCodeDriver {
         std::env::var("XSFIRE_CLAUDE_MODEL").ok()
     }
 
+    fn help_text() -> String {
+        format!(
+            "Claude commands:\n- /status\n- /model <name>\n- /reset\n\n{}",
+            BackendKind::ClaudeCode
+                .work_orchestration_profile()
+                .render_summary(),
+        )
+    }
+
+    fn status_text(model: &str, history_turns: usize) -> String {
+        let profile = BackendKind::ClaudeCode.work_orchestration_profile();
+        format!(
+            "Claude session status:\n- model: {model}\n- history_turns: {history_turns}\n- task_orchestration: {}\n- task_monitoring: {}\n- progress_vector_checks: {}\n- preempt_on_new_prompt: {}\n- acp_bridge: {}\n- work_orchestration_sequence: {} ({})\n- operator_hint: {}",
+            profile.task_orchestration,
+            profile.task_monitoring,
+            profile.vector_checks_value(),
+            profile.preempt_value(),
+            profile.bridge_summary(),
+            crate::backend::WorkOrchestrationProfile::SEQUENCE,
+            crate::backend::WorkOrchestrationProfile::GLOSSARY,
+            profile.operator_hint,
+        )
+    }
+
     fn validate_auth_method(method_id: &str) -> Result<(), Error> {
         if method_id == Self::AUTH_METHOD_ID {
             return Ok(());
@@ -364,15 +388,10 @@ impl BackendDriver for ClaudeCodeDriver {
                     return Err(Error::resource_not_found(None));
                 };
                 match command {
-                    ClaudeCommand::Help => {
-                        "Claude commands:\n- /status\n- /model <name>\n- /reset".to_string()
-                    }
+                    ClaudeCommand::Help => Self::help_text(),
                     ClaudeCommand::Status => {
                         let model = session.model.as_deref().unwrap_or("default");
-                        format!(
-                            "Claude session status:\n- model: {model}\n- history_turns: {}",
-                            session.history.len()
-                        )
+                        Self::status_text(model, session.history.len())
                     }
                     ClaudeCommand::Reset => {
                         session.history.clear();
@@ -821,5 +840,26 @@ printf '%s\n' 'fake claude output'
             .unwrap()
             .to_string();
         assert!(message.contains("unsupported config option for claude backend"));
+    }
+
+    #[test]
+    fn claude_help_text_exposes_work_orchestration_profile() {
+        let help = ClaudeCodeDriver::help_text();
+        assert!(help.contains("Claude commands:"));
+        assert!(help.contains("Work orchestration profile: Claude Code"));
+        assert!(help.contains("Goal/Rubric/Next Action"));
+        assert!(help.contains("single ACP message chunk only"));
+    }
+
+    #[test]
+    fn claude_status_text_exposes_sequential_profile_defaults() {
+        let status = ClaudeCodeDriver::status_text("claude-3-7-sonnet", 2);
+        assert!(status.contains("- model: claude-3-7-sonnet"));
+        assert!(status.contains("- history_turns: 2"));
+        assert!(status.contains("- task_orchestration: sequential"));
+        assert!(status.contains("- task_monitoring: status-only"));
+        assert!(status.contains("- progress_vector_checks: off"));
+        assert!(status.contains("- preempt_on_new_prompt: off"));
+        assert!(status.contains("- work_orchestration_sequence: R->P->M->W->A"));
     }
 }

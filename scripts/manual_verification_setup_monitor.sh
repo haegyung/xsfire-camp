@@ -80,18 +80,23 @@ cat > "$REPORT_PATH" <<EOF
 Run these in ACP client (e.g., Zed Agent Panel) using the same workspace.
 
 1. Run \`/setup\` and confirm setup wizard text + Plan panel appears.
-2. Run \`/status\` then check Plan step \`Verify: run /status, /monitor, and /vector\` changes from pending to in_progress.
-3. Run \`/monitor\` and confirm output includes:
+2. Ask ACP to output a markdown file link to a known local file in this workspace, click the link, and confirm it opens the intended absolute path without a \`-50\` error.
+3. Run \`/status\` then check Plan step \`Verify: run /status, /monitor, and /vector\` changes from pending to in_progress.
+4. While the task is still running, confirm ACP shows live plan progress in at least one visible surface:
+   - Zed: Plan panel rows update immediately.
+   - Non-Zed ACP client: agent text includes \`Plan update: ...\`, \`Current: ...\`, and optional \`Note: ...\`.
+5. Run \`/monitor\` and confirm output includes:
    - \`Task monitoring: orchestration=..., monitor=..., vector_checks=...\`
    - \`Task queue: ...\`
-4. Run \`/vector\` and confirm the same Plan verify step becomes completed.
-5. Open Config Options and change one option among:
+6. Run \`/vector\` and confirm the same Plan verify step becomes completed.
+7. Finish a prompt that triggers at least one tool call or exec step, wait for the final \`completed\` message, and confirm ACP leaves processing state promptly instead of spinning indefinitely.
+8. Open Config Options and change one option among:
    - Model / Reasoning Effort / Approval Preset
    - Task Orchestration / Task Monitoring / Progress Vector Checks
    Confirm Plan progress updates immediately.
-6. Set \`Task Orchestration\` to \`sequential\`, start one task, then send another prompt.
+9. Set \`Task Orchestration\` to \`sequential\`, start one task, then send another prompt.
    Confirm sequential wait guidance appears instead of submitting a parallel task.
-7. Inspect logs:
+10. Inspect logs:
    - \`logs/codex_chats/.../*.md\` contains Plan/ToolCall/RequestPermission traces.
    - Optional: \`ACP_HOME/sessions/<id>/canonical.jsonl\` contains \`acp.plan\` updates.
 

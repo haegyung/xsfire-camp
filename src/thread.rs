@@ -79,7 +79,9 @@ use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 use crate::{
-    ACP_CLIENT, current_client_info,
+    ACP_CLIENT,
+    backend::{BackendKind, WorkOrchestrationProfile},
+    current_client_info,
     link_paths::normalize_outgoing_local_markdown_links,
     prompt_args::{expand_custom_prompt, parse_slash_name},
     session_store::SessionStore,
@@ -1191,15 +1193,20 @@ struct TaskMonitoringState {
 
 impl Default for TaskMonitoringState {
     fn default() -> Self {
+        let profile = BackendKind::Codex.work_orchestration_profile();
         let preempt_on_new_prompt = std::env::var("ACP_PREEMPT_ON_NEW_PROMPT")
             .ok()
             .as_deref()
             .and_then(parse_on_off_env)
-            .unwrap_or(true);
+            .unwrap_or(profile.preempt_on_new_prompt);
         Self {
-            orchestration_mode: TaskOrchestrationMode::Parallel,
-            monitor_mode: TaskMonitoringMode::Auto,
-            vector_check_enabled: true,
+            orchestration_mode: TaskOrchestrationMode::from_config_value(
+                profile.task_orchestration,
+            )
+            .expect("codex orchestration profile must stay ACP-compatible"),
+            monitor_mode: TaskMonitoringMode::from_config_value(profile.task_monitoring)
+                .expect("codex monitoring profile must stay ACP-compatible"),
+            vector_check_enabled: profile.vector_checks,
             preempt_on_new_prompt,
         }
     }
@@ -3057,6 +3064,35 @@ impl PromptState {
                     );
                 }
             }
+        } else if self.open_tool_calls.contains_key(&call_id) {
+            let kind = self
+                .open_tool_calls
+                .get(&call_id)
+                .map(|open| open.kind)
+                .unwrap_or("exec_command");
+            self.mark_tool_exec_finished(
+                client,
+                &call_id,
+                kind,
+                status,
+                Some(exit_code),
+                Some("missing_active_command_fallback"),
+            );
+            client
+                .send_tool_call_update(ToolCallUpdate::new(
+                    call_id.clone(),
+                    ToolCallUpdateFields::new()
+                        .status(status)
+                        .raw_output(raw_output),
+                ))
+                .await;
+            self.open_tool_calls.remove(&call_id);
+            self.mark_tool_result_sent(
+                client,
+                &call_id,
+                status,
+                Some("missing_active_command_fallback"),
+            );
         }
     }
 
@@ -3379,6 +3415,36 @@ impl SessionClient {
         ))
     }
 
+    fn non_zed_plan_progress_text(
+        &self,
+        plan: &[PlanItemArg],
+        explanation: Option<&str>,
+    ) -> Option<String> {
+        if self.is_zed_client() || plan.is_empty() {
+            return None;
+        }
+
+        let (completed, in_progress, pending, total) = Self::plan_status_counts(plan);
+        let mut lines = vec![format!(
+            "Plan update: {completed}/{total} completed, {in_progress} in progress, {pending} pending."
+        )];
+
+        if let Some(current_step) = plan.iter().find_map(|item| {
+            matches!(item.status, StepStatus::InProgress).then_some(item.step.as_str())
+        }) {
+            lines.push(format!("Current: {current_step}"));
+        }
+
+        if let Some(explanation) = explanation
+            .map(str::trim)
+            .filter(|explanation| !explanation.is_empty())
+        {
+            lines.push(format!("Note: {explanation}"));
+        }
+
+        Some(lines.join("\n"))
+    }
+
     fn runtime_diagnostics_snapshot(
         &self,
         reason: impl Into<String>,
@@ -3623,6 +3689,7 @@ impl SessionClient {
     }
 
     async fn update_plan(&self, plan: Vec<PlanItemArg>, explanation: Option<String>) {
+        let progress_text = self.non_zed_plan_progress_text(&plan, explanation.as_deref());
         let mut data = json!({
             "items": plan.iter().map(|p| {
                 json!({
@@ -3664,6 +3731,10 @@ impl SessionClient {
 
         self.send_notification(SessionUpdate::Plan(Plan::new(entries)))
             .await;
+
+        if let Some(progress_text) = progress_text {
+            self.send_agent_text(progress_text).await;
+        }
     }
 
     async fn request_permission(
@@ -3738,6 +3809,10 @@ struct ThreadActor<A> {
 }
 
 impl<A: Auth> ThreadActor<A> {
+    fn codex_work_orchestration_profile(&self) -> WorkOrchestrationProfile {
+        BackendKind::Codex.work_orchestration_profile()
+    }
+
     fn new(
         auth: A,
         client: SessionClient,
@@ -4329,7 +4404,9 @@ impl<A: Auth> ThreadActor<A> {
                         ],
                     )
                     .category(SessionConfigOptionCategory::Other)
-                    .description("Controls prompt/task orchestration strategy"),
+                    .description(
+                        "Controls prompt/task orchestration strategy. Codex / ChatGPT evidence-backed default is `parallel` because ACP bridges live plan and tool updates.",
+                    ),
                 );
 
                 options.push(
@@ -4349,7 +4426,9 @@ impl<A: Auth> ThreadActor<A> {
                         ],
                     )
                     .category(SessionConfigOptionCategory::Other)
-                    .description("Enable or disable task-level monitoring"),
+                    .description(
+                        "Enable or disable task-level monitoring. Codex / ChatGPT evidence-backed default is `auto` to keep ACP progress visible while work is active.",
+                    ),
                 );
 
                 options.push(
@@ -4369,7 +4448,9 @@ impl<A: Auth> ThreadActor<A> {
                         ],
                     )
                     .category(SessionConfigOptionCategory::Other)
-                    .description("Enable or disable progress vector checks"),
+                    .description(
+                        "Enable or disable progress vector checks. Codex / ChatGPT evidence-backed default is `on`.",
+                    ),
                 );
 
                 options.push(
@@ -4391,7 +4472,9 @@ impl<A: Auth> ThreadActor<A> {
                         ],
                     )
                     .category(SessionConfigOptionCategory::Other)
-                    .description("Controls whether new prompts preempt currently running submissions"),
+                    .description(
+                        "Controls whether new prompts preempt currently running submissions. Codex / ChatGPT evidence-backed default is `on` for ACP bridge stability.",
+                    ),
                 );
             }
 
@@ -4852,6 +4935,7 @@ impl<A: Auth> ThreadActor<A> {
     }
 
     fn render_setup_wizard_message(&self) -> String {
+        let profile = self.codex_work_orchestration_profile();
         let mut lines = Vec::new();
         lines.push("xsfire-camp setup wizard".to_string());
         lines.push("(See the Plan panel for the step-by-step checklist.)".to_string());
@@ -4860,10 +4944,14 @@ impl<A: Auth> ThreadActor<A> {
         lines.push("- Lock Goal (one sentence with verifiable done criteria).".to_string());
         lines.push("- Define Rubric: Must (with evidence) / Should (quality).".to_string());
         lines.push(
-            "- Iterate in order: Research -> Plan -> Implement -> Verify -> Score.".to_string(),
+            "- Work-orchestration sequence: R->P->M->W->A (Root -> Phase -> Milestone -> Work package -> Action).".to_string(),
         );
         lines.push(
-            "- Keep iterating until Must reaches 100% and keep Plan UI updated each iteration."
+            "- Execution loop: Research -> Rubric -> Plan -> Implement -> Verify -> Score."
+                .to_string(),
+        );
+        lines.push(
+            "- Keep iterating until Must reaches 100%, keep Plan UI updated each iteration, and leave one ACP-visible action artifact per pass."
                 .to_string(),
         );
         lines.push(String::new());
@@ -4899,6 +4987,10 @@ impl<A: Auth> ThreadActor<A> {
         );
         lines.push(String::new());
         lines.push("5) UX helpers".to_string());
+        lines.push(format!(
+            "- Codex / ChatGPT evidence: {}",
+            profile.evidence_summary
+        ));
         lines.push(format!(
             "- Task orchestration default: `{}`",
             self.task_monitoring.orchestration_mode.as_config_value()
@@ -4944,6 +5036,7 @@ impl<A: Auth> ThreadActor<A> {
 
     fn setup_wizard_plan_items(&self) -> Vec<PlanItemArg> {
         let mut items = Vec::new();
+        let profile = self.codex_work_orchestration_profile();
 
         items.push(PlanItemArg {
             step: "Protocol: Goal -> Rubric(Must/Should+Evidence) locked".to_string(),
@@ -4952,12 +5045,21 @@ impl<A: Auth> ThreadActor<A> {
 
         items.push(PlanItemArg {
             step: format!(
-                "Loop gate: iterate Research -> Plan -> Implement -> Verify -> Score until Must=100% ({}/{}, {}%)",
+                "Loop gate: iterate Research -> Rubric -> Plan -> Implement -> Verify -> Score until Must=100% ({}/{}, {}%)",
                 self.setup_wizard_progress.completed_count(),
                 SetupWizardProgressState::TOTAL_VERIFICATION_STEPS,
                 self.setup_wizard_progress.progress_percent()
             ),
             status: self.setup_wizard_progress.verification_status(),
+        });
+
+        items.push(PlanItemArg {
+            step: format!(
+                "Protocol: {} sequence active ({})",
+                WorkOrchestrationProfile::SEQUENCE,
+                profile.display_name
+            ),
+            status: StepStatus::Completed,
         });
 
         // Authentication: if the session exists, the driver already passed `check_auth()` for
@@ -5588,6 +5690,7 @@ impl<A: Auth> ThreadActor<A> {
                 "status" => {
                     self.setup_wizard_progress.status_checked = true;
                     self.maybe_emit_config_options_update().await;
+                    let profile = self.codex_work_orchestration_profile();
                     let current_model = self.get_current_model().await;
                     let approval_preset = self
                         .modes()
@@ -5606,7 +5709,10 @@ impl<A: Auth> ThreadActor<A> {
                     let (x, y, magnitude, heading, semantic) = self.flow_vector.resultant_vector();
                     self.client
                         .send_agent_text(format!(
-                            "Session status:\n- model: {current_model}\n- reasoning_effort: {effort}\n- personality: {personality}\n- approval_preset: {approval_preset}\n- context_optimization: {} (trigger {}%)\n- task_orchestration: {}\n- task_monitoring: {}\n- progress_vector_checks: {}\n- preempt_on_new_prompt: {}\n- workflow_vector: ({x}, {y}), |v|={magnitude:.2}, heading={heading}\n- workflow_semantic: {semantic}",
+                            "Session status:\n- model: {current_model}\n- reasoning_effort: {effort}\n- personality: {personality}\n- approval_preset: {approval_preset}\n- work_orchestration_profile: {} ({})\n- acp_bridge: {}\n- context_optimization: {} (trigger {}%)\n- task_orchestration: {}\n- task_monitoring: {}\n- progress_vector_checks: {}\n- preempt_on_new_prompt: {}\n- workflow_vector: ({x}, {y}), |v|={magnitude:.2}, heading={heading}\n- workflow_semantic: {semantic}",
+                            profile.display_name,
+                            WorkOrchestrationProfile::SEQUENCE,
+                            profile.bridge_summary(),
                             self.context_optimization.mode.as_config_value(),
                             self.context_optimization.trigger_percent,
                             self.task_monitoring.orchestration_mode.as_config_value(),
@@ -7999,9 +8105,11 @@ mod tests {
                                 content: ContentBlock::Text(TextContent { text, .. }),
                                 ..
                             }) if text.contains("- task_monitoring: auto")
+                                && text.contains("- work_orchestration_profile: Codex / ChatGPT (R->P->M->W->A)")
+                                && text.contains("- acp_bridge: live ACP plan/tool updates available")
                         )
                     }),
-                    "status should reflect task monitoring mode as auto after setting config. notifications={notifications:?}"
+                    "status should reflect the codex work-orchestration profile after setting config. notifications={notifications:?}"
                 );
                 drop(message_tx);
                 anyhow::Ok(())
@@ -8480,6 +8588,13 @@ mod tests {
             text_chunks.iter().any(|text| text.contains("setup wizard")),
             "notifications don't match {notifications:?}"
         );
+        assert!(
+            text_chunks
+                .iter()
+                .any(|text| text.contains("R->P->M->W->A")
+                    && text.contains("Codex / ChatGPT evidence")),
+            "setup wizard should expose the codex work-orchestration baseline. notifications={notifications:?}"
+        );
 
         let plan = notifications.iter().find_map(|n| match &n.update {
             SessionUpdate::Plan(plan) => Some(plan),
@@ -8495,6 +8610,7 @@ mod tests {
             .collect::<Vec<_>>();
         for expected in [
             "Protocol: Goal -> Rubric(Must/Should+Evidence) locked",
+            "Protocol: R->P->M->W->A sequence active (Codex / ChatGPT)",
             "Setup: authentication",
             "Setup: choose model",
             "Setup: choose reasoning effort",
@@ -8512,7 +8628,7 @@ mod tests {
         assert!(
             steps.iter().any(|entry| {
                 entry.starts_with(
-                    "Loop gate: iterate Research -> Plan -> Implement -> Verify -> Score until Must=100% (",
+                    "Loop gate: iterate Research -> Rubric -> Plan -> Implement -> Verify -> Score until Must=100% (",
                 )
             }),
             "expected plan to include rubric loop gate step. steps={steps:?}"
@@ -8659,6 +8775,147 @@ mod tests {
 
             let ops = thread.ops.lock().unwrap();
             assert!(ops.is_empty(), "setup command should not submit backend op");
+
+            Ok(())
+        }
+        .await;
+        crate::record_client_info(None);
+        result
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_update_plan_emits_visible_progress_text_for_non_zed_client() -> anyhow::Result<()>
+    {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        crate::record_client_info(Some("other-client@plan-text-test".to_string()));
+        let result = async {
+            let session_id = SessionId::new("plan-text-test");
+            let client = Arc::new(StubClient::new());
+            let session_client =
+                SessionClient::with_client(session_id, client.clone(), Arc::default(), None);
+
+            session_client
+                .update_plan(
+                    vec![
+                        PlanItemArg {
+                            step: "Research current ACP behavior".to_string(),
+                            status: StepStatus::Completed,
+                        },
+                        PlanItemArg {
+                            step: "Patch ACP runtime behavior".to_string(),
+                            status: StepStatus::InProgress,
+                        },
+                        PlanItemArg {
+                            step: "Verify targeted regressions".to_string(),
+                            status: StepStatus::Pending,
+                        },
+                    ],
+                    Some("Keep ACP users aware of live plan progress.".to_string()),
+                )
+                .await;
+
+            let notifications = client.notifications.lock().unwrap();
+            let plan = notifications.iter().find_map(|notification| match &notification.update {
+                SessionUpdate::Plan(plan) => Some(plan),
+                _ => None,
+            });
+            let Some(plan) = plan else {
+                panic!("expected plan notification. notifications={notifications:?}");
+            };
+
+            assert!(
+                plan.entries.iter().all(|entry| {
+                    !entry.content.starts_with("Progress: [") && !entry.content.starts_with("Plan update:")
+                }),
+                "expected plan entries to stay canonical for non-zed clients. plan={plan:?}"
+            );
+
+            let text_chunks = notifications
+                .iter()
+                .filter_map(|notification| match &notification.update {
+                    SessionUpdate::AgentMessageChunk(ContentChunk {
+                        content: ContentBlock::Text(TextContent { text, .. }),
+                        ..
+                    }) => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+
+            assert!(
+                text_chunks.iter().any(|text| text.contains(
+                    "Plan update: 1/3 completed, 1 in progress, 1 pending."
+                )),
+                "expected visible plan progress text for non-zed client. notifications={notifications:?}"
+            );
+            assert!(
+                text_chunks
+                    .iter()
+                    .any(|text| text.contains("Current: Patch ACP runtime behavior")),
+                "expected plan progress text to include current step. notifications={notifications:?}"
+            );
+            assert!(
+                text_chunks.iter().any(|text| {
+                    text.contains("Note: Keep ACP users aware of live plan progress.")
+                }),
+                "expected plan progress text to include explanation. notifications={notifications:?}"
+            );
+
+            Ok(())
+        }
+        .await;
+        crate::record_client_info(None);
+        result
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_update_plan_avoids_duplicate_progress_text_for_zed_client() -> anyhow::Result<()>
+    {
+        let _guard = crate::session_store::ENV_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap();
+
+        crate::record_client_info(Some("zed@plan-text-test".to_string()));
+        let result = async {
+            let session_id = SessionId::new("plan-text-zed-test");
+            let client = Arc::new(StubClient::new());
+            let session_client =
+                SessionClient::with_client(session_id, client.clone(), Arc::default(), None);
+
+            session_client
+                .update_plan(
+                    vec![PlanItemArg {
+                        step: "Patch ACP runtime behavior".to_string(),
+                        status: StepStatus::InProgress,
+                    }],
+                    Some("Zed already renders plan updates.".to_string()),
+                )
+                .await;
+
+            let notifications = client.notifications.lock().unwrap();
+            let text_chunks = notifications
+                .iter()
+                .filter_map(|notification| match &notification.update {
+                    SessionUpdate::AgentMessageChunk(ContentChunk {
+                        content: ContentBlock::Text(TextContent { text, .. }),
+                        ..
+                    }) => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+
+            assert!(
+                text_chunks
+                    .iter()
+                    .all(|text| !text.contains("Plan update:")),
+                "expected zed client to rely on plan rows instead of duplicate text. notifications={notifications:?}"
+            );
 
             Ok(())
         }
@@ -9942,7 +10199,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_send_agent_text_normalizes_local_markdown_file_links() -> anyhow::Result<()> {
+    async fn test_send_agent_text_preserves_local_markdown_file_links() -> anyhow::Result<()> {
         let session_id = SessionId::new("local-link-normalization-test");
         let client = Arc::new(StubClient::new());
         let session_client =
@@ -9965,8 +10222,8 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             text_chunks,
-            vec!["[open](file:///Volumes/Extend/Projects/Writer/_open/test.md)".to_string()],
-            "expected outgoing ACP agent text to normalize bare local markdown links. notifications={notifications:?}"
+            vec!["[open](/Volumes/Extend/Projects/Writer/_open/test.md)".to_string()],
+            "expected outgoing ACP agent text to preserve bare local markdown links. notifications={notifications:?}"
         );
 
         Ok(())
@@ -10129,6 +10386,53 @@ mod tests {
         assert!(
             state.open_tool_calls.is_empty(),
             "expected watchdog to clear open tool calls"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_prompt_state_closes_exec_tool_call_when_end_arrives_without_active_command()
+    -> anyhow::Result<()> {
+        let session_id = SessionId::new("missing-active-command-fallback-test");
+        let client = Arc::new(StubClient::new());
+        let session_client =
+            SessionClient::with_client(session_id, client.clone(), Arc::default(), None);
+        let thread = Arc::new(StubCodexThread::new());
+        let mut state = PromptState::new_background(thread, "submission-3".to_string());
+
+        state
+            .handle_event(
+                &session_client,
+                EventMsg::ExecCommandBegin(test_exec_begin_event("exec-call-fallback")),
+            )
+            .await;
+        state.active_command = None;
+
+        state
+            .handle_event(
+                &session_client,
+                EventMsg::ExecCommandEnd(test_exec_end_event("exec-call-fallback", 0)),
+            )
+            .await;
+
+        let notifications = client.notifications.lock().unwrap();
+        let saw_completed_update = notifications.iter().any(|notification| {
+            matches!(
+                &notification.update,
+                SessionUpdate::ToolCallUpdate(update)
+                    if update.tool_call_id.0.as_ref() == "exec-call-fallback"
+                        && update.fields.status == Some(ToolCallStatus::Completed)
+            )
+        });
+
+        assert!(
+            saw_completed_update,
+            "expected completed tool-call update when exec end arrives without active command. notifications={notifications:?}"
+        );
+        assert!(
+            state.open_tool_calls.is_empty(),
+            "expected missing-active-command fallback to clear open tool calls"
         );
 
         Ok(())

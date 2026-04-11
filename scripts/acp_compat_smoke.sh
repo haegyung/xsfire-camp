@@ -117,6 +117,9 @@ run_rg_present "load_session capability is delegated to backend driver" \
 run_rg_present "plan updates are emitted to ACP notifications" \
   "client\\.update_plan\\(plan, explanation\\)\\.await;" \
   "src/thread.rs"
+run_rg_present "non-zed clients also receive visible plan progress text" \
+  "self\\.send_agent_text\\(progress_text\\)\\.await;" \
+  "src/thread.rs"
 run_rg_present "tool call updates are emitted" \
   "SessionUpdate::ToolCallUpdate" \
   "src/thread.rs"
@@ -198,13 +201,29 @@ else
       "cargo test -q thread::tests::test_setup_plan_verification_progress_updates" \
       "$LOG_DIR/acp_smoke_setup_plan_${TIMESTAMP}.log"
     run_test_command \
+      "cargo test -q thread::tests::test_update_plan_emits_visible_progress_text_for_non_zed_client" \
+      "cargo test -q thread::tests::test_update_plan_emits_visible_progress_text_for_non_zed_client" \
+      "$LOG_DIR/acp_smoke_plan_text_non_zed_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q thread::tests::test_update_plan_avoids_duplicate_progress_text_for_zed_client" \
+      "cargo test -q thread::tests::test_update_plan_avoids_duplicate_progress_text_for_zed_client" \
+      "$LOG_DIR/acp_smoke_plan_text_zed_${TIMESTAMP}.log"
+    run_test_command \
       "cargo test -q thread::tests::test_setup_plan_visible_in_monitor_output" \
       "cargo test -q thread::tests::test_setup_plan_visible_in_monitor_output" \
       "$LOG_DIR/acp_smoke_setup_monitor_${TIMESTAMP}.log"
     run_test_command \
+      "cargo test -q thread::tests::test_send_agent_text_preserves_local_markdown_file_links" \
+      "cargo test -q thread::tests::test_send_agent_text_preserves_local_markdown_file_links" \
+      "$LOG_DIR/acp_smoke_link_paths_${TIMESTAMP}.log"
+    run_test_command \
       "cargo test -q thread::tests::test_monitoring_auto_mode_clears_completed_prompt_tasks" \
       "cargo test -q thread::tests::test_monitoring_auto_mode_clears_completed_prompt_tasks" \
       "$LOG_DIR/acp_smoke_task_cleanup_${TIMESTAMP}.log"
+    run_test_command \
+      "cargo test -q thread::tests::test_prompt_state_closes_exec_tool_call_when_end_arrives_without_active_command" \
+      "cargo test -q thread::tests::test_prompt_state_closes_exec_tool_call_when_end_arrives_without_active_command" \
+      "$LOG_DIR/acp_smoke_exec_completion_fallback_${TIMESTAMP}.log"
     run_test_command \
       "cargo test -q thread::tests::test_canonical_log_correlation_path" \
       "cargo test -q thread::tests::test_canonical_log_correlation_path" \

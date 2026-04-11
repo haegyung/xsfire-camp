@@ -96,7 +96,30 @@ impl MultiBackendDriver {
             ],
         )
         .category(SessionConfigOptionCategory::Other)
-        .description("Choose which backend handles this thread")
+        .description("Choose which backend handles this thread and apply its evidence-backed work-orchestration profile")
+    }
+
+    fn backend_usage_message() -> String {
+        format!(
+            "Usage: /backend <codex|claude-code|gemini>\n- codex: {}\n- claude-code: {}\n- gemini: {}",
+            BackendKind::Codex
+                .work_orchestration_profile()
+                .bridge_summary(),
+            BackendKind::ClaudeCode
+                .work_orchestration_profile()
+                .bridge_summary(),
+            BackendKind::Gemini
+                .work_orchestration_profile()
+                .bridge_summary(),
+        )
+    }
+
+    fn backend_switch_message(target_backend: BackendKind) -> String {
+        format!(
+            "Switched backend to `{}` for this thread.\n{}",
+            target_backend.as_str(),
+            target_backend.work_orchestration_profile().render_summary(),
+        )
     }
 
     fn with_backend_option(
@@ -505,19 +528,12 @@ impl BackendDriver for MultiBackendDriver {
                 session.active_backend = target_backend;
             }
 
-            send_agent_text(
-                &session_id,
-                format!(
-                    "Switched backend to `{}` for this thread.",
-                    target_backend.as_str()
-                ),
-            )
-            .await;
+            send_agent_text(&session_id, Self::backend_switch_message(target_backend)).await;
             return Ok(PromptResponse::new(StopReason::EndTurn));
         }
 
         if Self::is_switch_backend_command(&prompt_text) {
-            send_agent_text(&session_id, "Usage: /backend <codex|claude-code|gemini>").await;
+            send_agent_text(&session_id, Self::backend_usage_message()).await;
             return Ok(PromptResponse::new(StopReason::EndTurn));
         }
 
@@ -609,10 +625,7 @@ impl BackendDriver for MultiBackendDriver {
             }
             send_agent_text(
                 &args.session_id,
-                format!(
-                    "Switched backend to `{}` for this thread.",
-                    target_backend.as_str()
-                ),
+                Self::backend_switch_message(target_backend),
             )
             .await;
             return Ok(SetSessionConfigOptionResponse::new(merged_options));
@@ -1113,5 +1126,22 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(option_ids.iter().any(|id| id == "backend"));
         assert!(option_ids.iter().any(|id| id == "model"));
+    }
+
+    #[test]
+    fn backend_switch_message_includes_profile_summary() {
+        let message = MultiBackendDriver::backend_switch_message(BackendKind::ClaudeCode);
+        assert!(message.contains("Switched backend to `claude-code`"));
+        assert!(message.contains("Work orchestration profile: Claude Code"));
+        assert!(message.contains("Goal/Rubric/Next Action"));
+        assert!(message.contains("single ACP message chunk only"));
+    }
+
+    #[test]
+    fn backend_usage_message_lists_backend_bridge_modes() {
+        let message = MultiBackendDriver::backend_usage_message();
+        assert!(message.contains("codex: live ACP plan/tool updates available"));
+        assert!(message.contains("claude-code: single ACP message chunk only"));
+        assert!(message.contains("gemini: single ACP message chunk only"));
     }
 }

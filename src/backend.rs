@@ -15,6 +15,60 @@ pub enum BackendKind {
     Multi,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkOrchestrationProfile {
+    pub display_name: &'static str,
+    pub evidence_summary: &'static str,
+    pub task_orchestration: &'static str,
+    pub task_monitoring: &'static str,
+    pub vector_checks: bool,
+    pub preempt_on_new_prompt: bool,
+    pub supports_live_plan_updates: bool,
+    pub supports_live_tool_calls: bool,
+    pub operator_hint: &'static str,
+}
+
+impl WorkOrchestrationProfile {
+    pub const SEQUENCE: &'static str = "R->P->M->W->A";
+    pub const GLOSSARY: &'static str = "R=Root, P=Phase, M=Milestone, W=Work package, A=Action";
+
+    pub const fn vector_checks_value(self) -> &'static str {
+        if self.vector_checks { "on" } else { "off" }
+    }
+
+    pub const fn preempt_value(self) -> &'static str {
+        if self.preempt_on_new_prompt {
+            "on"
+        } else {
+            "off"
+        }
+    }
+
+    pub const fn bridge_summary(self) -> &'static str {
+        if self.supports_live_plan_updates && self.supports_live_tool_calls {
+            "live ACP plan/tool updates available"
+        } else {
+            "single ACP message chunk only"
+        }
+    }
+
+    pub fn render_summary(self) -> String {
+        format!(
+            "Work orchestration profile: {}\n- Sequence: {} ({})\n- Evidence: {}\n- Defaults: orchestration={}, monitoring={}, vector_checks={}, preempt={}\n- ACP bridge: {}\n- Operator hint: {}",
+            self.display_name,
+            Self::SEQUENCE,
+            Self::GLOSSARY,
+            self.evidence_summary,
+            self.task_orchestration,
+            self.task_monitoring,
+            self.vector_checks_value(),
+            self.preempt_value(),
+            self.bridge_summary(),
+            self.operator_hint,
+        )
+    }
+}
+
 impl BackendKind {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
@@ -32,6 +86,55 @@ impl BackendKind {
             Self::ClaudeCode => "claude-code",
             Self::Gemini => "gemini",
             Self::Multi => "multi",
+        }
+    }
+
+    pub const fn work_orchestration_profile(self) -> WorkOrchestrationProfile {
+        match self {
+            Self::Codex => WorkOrchestrationProfile {
+                display_name: "Codex / ChatGPT",
+                evidence_summary: "Full ACP parity: sessions, approvals, tool calls, and live plan updates.",
+                task_orchestration: "parallel",
+                task_monitoring: "auto",
+                vector_checks: true,
+                preempt_on_new_prompt: true,
+                supports_live_plan_updates: true,
+                supports_live_tool_calls: true,
+                operator_hint: "Use for tool-heavy or concurrent turns; ACP can keep plan/tool state live.",
+            },
+            Self::ClaudeCode => WorkOrchestrationProfile {
+                display_name: "Claude Code",
+                evidence_summary: "`claude --print --cwd <cwd> <prompt>` returns one ACP text stream; live tool/approval bridging is not wired yet.",
+                task_orchestration: "sequential",
+                task_monitoring: "status-only",
+                vector_checks: false,
+                preempt_on_new_prompt: false,
+                supports_live_plan_updates: false,
+                supports_live_tool_calls: false,
+                operator_hint: "Keep one bounded goal per turn, externalize Goal/Rubric/Next Action in the prompt, and use /status between iterations.",
+            },
+            Self::Gemini => WorkOrchestrationProfile {
+                display_name: "Gemini CLI",
+                evidence_summary: "`gemini --output-format text --approval-mode plan --prompt` returns one ACP text stream; live tool/approval bridging is not wired yet.",
+                task_orchestration: "sequential",
+                task_monitoring: "status-only",
+                vector_checks: false,
+                preempt_on_new_prompt: false,
+                supports_live_plan_updates: false,
+                supports_live_tool_calls: false,
+                operator_hint: "Keep one bounded goal per turn, ask Gemini to echo Goal/Rubric/Next Action, and use /status between iterations.",
+            },
+            Self::Multi => WorkOrchestrationProfile {
+                display_name: "Unified ACP Router",
+                evidence_summary: "Routes one thread across Codex, Claude Code, or Gemini; the active backend decides the actual ACP affordances.",
+                task_orchestration: "backend-specific",
+                task_monitoring: "backend-specific",
+                vector_checks: false,
+                preempt_on_new_prompt: false,
+                supports_live_plan_updates: false,
+                supports_live_tool_calls: false,
+                operator_hint: "Switch backends explicitly when the task shape changes so ACP can show the correct work-orchestration profile.",
+            },
         }
     }
 }
@@ -211,5 +314,37 @@ impl BackendDriver for UnsupportedBackendDriver {
         _args: SetSessionConfigOptionRequest,
     ) -> Result<SetSessionConfigOptionResponse, Error> {
         Err(self.err())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BackendKind;
+
+    #[test]
+    fn codex_profile_uses_live_acp_defaults() {
+        let profile = BackendKind::Codex.work_orchestration_profile();
+
+        assert_eq!(profile.task_orchestration, "parallel");
+        assert_eq!(profile.task_monitoring, "auto");
+        assert_eq!(profile.vector_checks_value(), "on");
+        assert_eq!(profile.preempt_value(), "on");
+        assert!(profile.supports_live_plan_updates);
+        assert!(profile.supports_live_tool_calls);
+        assert!(profile.render_summary().contains("R->P->M->W->A"));
+    }
+
+    #[test]
+    fn claude_and_gemini_profiles_are_sequential_summary_only() {
+        for backend in [BackendKind::ClaudeCode, BackendKind::Gemini] {
+            let profile = backend.work_orchestration_profile();
+
+            assert_eq!(profile.task_orchestration, "sequential");
+            assert_eq!(profile.task_monitoring, "status-only");
+            assert_eq!(profile.vector_checks_value(), "off");
+            assert_eq!(profile.preempt_value(), "off");
+            assert_eq!(profile.bridge_summary(), "single ACP message chunk only");
+            assert!(profile.render_summary().contains("Goal/Rubric/Next Action"));
+        }
     }
 }
